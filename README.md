@@ -11,3 +11,7 @@ Revival is the Better Content pack's Forge 1.20.1 cooperative downed-player syst
 ```
 
 The deployable artifact is the reobfuscated `build/libs/revival-<version>.jar` staged by `assemble`.
+
+## Community and support
+
+For modpack and mod discussion, playtest feedback, and bug reports, join the [Better Content Discord](https://discord.gg/EkRnZbzqS9).
