@@ -1,0 +1,14 @@
+{
+  "revival.hud.downed": "DOWN BUT NOT OUT",
+  "revival.hud.time": "%s remaining",
+  "revival.hud.give_up_locked": "You can give up in %s",
+  "revival.hud.give_up": "Hold Sneak to give up",
+  "revival.hud.giving_up": "Giving up",
+  "revival.hud.reviving": "Reviving %s",
+  "revival.hud.helpers": "%s helping",
+  "subtitles.revival.downed_whisper": "A life tether whispers",
+  "death.attack.revival.bled_out": "%1$s bled out",
+  "death.attack.revival.bled_out.player": "%1$s succumbed after fighting %2$s",
+  "death.attack.revival.finished": "%1$s was finished",
+  "death.attack.revival.finished.player": "%1$s was finished by %2$s"
+}
