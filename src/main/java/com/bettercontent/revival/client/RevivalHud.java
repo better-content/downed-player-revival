@@ -43,7 +43,9 @@ public final class RevivalHud {
         graphics.fill(width - 10, 0, width, height, 0x38000000);
 
         int center = width / 2;
-        int y = height - 66;
+        int y = height - 116;
+        graphics.fill(center - 86, y - 6, center + 86, y + 40, 0xA8101010);
+        graphics.fill(center - 85, y - 5, center + 85, y + 39, 0x70271212);
         graphics.drawCenteredString(minecraft.font, Component.translatable("revival.hud.downed"), center, y, RED);
         graphics.drawCenteredString(minecraft.font,
                 Component.translatable("revival.hud.time", formatTicks(state.ticksLeft())), center, y + 12, WHITE);

@@ -2,8 +2,11 @@ package com.bettercontent.revival;
 
 import com.bettercontent.revival.api.RevivalApi;
 import com.bettercontent.revival.state.RevivalRules;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -40,6 +43,24 @@ public final class RevivalForgeEvents {
     public static void onHurt(LivingHurtEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !RevivalApi.isDowned(player)) return;
         if (RevivalRules.livingAttackerDamage(event.getSource().getEntity())) event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        event.getDispatcher().register(Commands.literal("revival")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("test")
+                        .then(Commands.literal("down")
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                                context.getSource().getOnlinePlayerNames(), builder))
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getServer().getPlayerList()
+                                                    .getPlayerByName(StringArgumentType.getString(context, "player"));
+                                            if (player == null || RevivalApi.isDowned(player)) return 0;
+                                            RevivalManager.down(player, player.damageSources().generic());
+                                            return 1;
+                                        })))));
     }
 
     @SubscribeEvent

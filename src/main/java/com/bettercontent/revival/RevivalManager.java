@@ -49,6 +49,7 @@ public final class RevivalManager {
         String damageType = source.typeHolder().unwrapKey().map(key -> key.location().toString()).orElse("");
         save(player, new RevivalState(RevivalConfig.BLEED_TICKS.get(), damageType));
         player.stopRiding();
+        player.fallDistance = 0.0f;
         player.setForcedPose(Pose.SWIMMING);
         player.setHealth(Math.min(player.getMaxHealth(), 10.0f));
         player.getFoodData().setFoodLevel(6);
