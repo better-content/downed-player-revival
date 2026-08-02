@@ -88,6 +88,10 @@ public final class ClientRevivalInput {
         }
 
         boolean downed = ClientRevivalState.isDowned(local.getUUID());
+        if (downed) {
+            minecraft.options.keyAttack.setDown(false);
+            minecraft.options.keyUse.setDown(false);
+        }
         int downedTicks = ClientRevivalState.get(local.getUUID()).map(packet -> packet.downedTicks()).orElse(0);
         boolean shouldGiveUp = downed
                 && downedTicks >= RevivalConfig.GIVE_UP_UNLOCK_TICKS.get()

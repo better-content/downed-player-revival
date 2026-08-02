@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -54,6 +55,10 @@ public final class RevivalManager {
         player.setHealth(Math.min(player.getMaxHealth(), 10.0f));
         player.getFoodData().setFoodLevel(6);
         sync(player, true);
+        Component cause = source.getEntity() == null
+                ? Component.translatable("revival.announcement.downed.cause", player.getDisplayName(), source.getLocalizedDeathMessage(player))
+                : Component.translatable("revival.announcement.downed.attacker", player.getDisplayName(), source.getEntity().getDisplayName());
+        player.server.getPlayerList().broadcastSystemMessage(cause, false);
         MinecraftForge.EVENT_BUS.post(new PlayerDownedEvent(player, source));
     }
 
@@ -165,12 +170,11 @@ public final class RevivalManager {
     }
 
     private static void terminate(ServerPlayer target, ServerPlayer attacker, boolean finished) {
-        String originalType = RevivalApi.isDowned(target) ? load(target).originalDamageType() : "";
         clearState(target);
         TERMINATING.add(target.getUUID());
         DamageSource source = finished
                 ? damageSource(target.serverLevel(), FINISHED, attacker)
-                : originalDamageSource(target.serverLevel(), originalType);
+                : damageSource(target.serverLevel(), BLED_OUT, attacker);
         target.setHealth(Math.max(1.0f, target.getHealth()));
         target.hurt(source, Float.MAX_VALUE);
         if (target.isAlive()) target.hurt(damageSource(target.serverLevel(), BLED_OUT, attacker), Float.MAX_VALUE);

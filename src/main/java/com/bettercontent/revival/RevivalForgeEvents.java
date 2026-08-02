@@ -11,6 +11,8 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -81,5 +83,15 @@ public final class RevivalForgeEvents {
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player && RevivalApi.isDowned(player)) RevivalManager.sync(player, true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onAttack(AttackEntityEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && RevivalApi.isDowned(player)) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onInteract(PlayerInteractEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && RevivalApi.isDowned(player)) event.setCanceled(true);
     }
 }

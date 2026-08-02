@@ -7,6 +7,8 @@
   "revival.hud.reviving": "Reviving %s",
   "revival.hud.helpers": "%s helping",
   "subtitles.revival.downed_whisper": "A life tether whispers",
+  "revival.announcement.downed.attacker": "%1$s was downed by %2$s",
+  "revival.announcement.downed.cause": "%1$s was downed: %2$s",
   "death.attack.revival.bled_out": "%1$s bled out",
   "death.attack.revival.bled_out.player": "%1$s succumbed after fighting %2$s",
   "death.attack.revival.finished": "%1$s was finished",
