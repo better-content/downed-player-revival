@@ -1,0 +1,13 @@
+{
+  "downed_whisper": {
+    "subtitle": "subtitles.downed_player_revival.downed_whisper",
+    "sounds": [
+      {
+        "name": "minecraft:entity.warden.ambient",
+        "type": "event",
+        "volume": 0.22,
+        "pitch": 1.18
+      }
+    ]
+  }
+}

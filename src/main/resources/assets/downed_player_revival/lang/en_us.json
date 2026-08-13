@@ -1,0 +1,16 @@
+{
+  "downed_player_revival.hud.downed": "DOWN BUT NOT OUT",
+  "downed_player_revival.hud.time": "%s remaining",
+  "downed_player_revival.hud.give_up_locked": "You can give up in %s",
+  "downed_player_revival.hud.give_up": "Hold Sneak to give up",
+  "downed_player_revival.hud.giving_up": "Giving up",
+  "downed_player_revival.hud.reviving": "Reviving %s",
+  "downed_player_revival.hud.helpers": "%s helping",
+  "subtitles.downed_player_revival.downed_whisper": "A life tether whispers",
+  "downed_player_revival.announcement.downed.attacker": "%1$s was downed by %2$s",
+  "downed_player_revival.announcement.downed.cause": "%1$s was downed: %2$s",
+  "death.attack.downed_player_revival.bled_out": "%1$s bled out",
+  "death.attack.downed_player_revival.bled_out.player": "%1$s succumbed after fighting %2$s",
+  "death.attack.downed_player_revival.finished": "%1$s was finished",
+  "death.attack.downed_player_revival.finished.player": "%1$s was finished by %2$s"
+}

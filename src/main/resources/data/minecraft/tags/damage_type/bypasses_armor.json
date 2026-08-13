@@ -1,7 +1,7 @@
 {
   "replace": false,
   "values": [
-    "revival:bled_out",
-    "revival:finished"
+    "downed_player_revival:bled_out",
+    "downed_player_revival:finished"
   ]
 }

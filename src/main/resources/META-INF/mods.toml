@@ -6,11 +6,11 @@ license="AGPL-3.0-or-later"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-displayURL="https://github.com/better-content/revival"
-issueTrackerURL="https://github.com/better-content/revival/issues"
+displayURL="https://github.com/better-content/downed_player_revival"
+issueTrackerURL="https://github.com/better-content/downed_player_revival/issues"
 authors="Better Content"
 description='''
-Down but not out: a server-authoritative cooperative revival system.
+Down but not out: a server-authoritative cooperative downed_player_revival system.
 '''
 
 [[dependencies.${mod_id}]]

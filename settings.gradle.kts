@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "revival"
+rootProject.name = "downed-player-revival"
