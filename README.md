@@ -10,7 +10,7 @@ Revival is the Better Content pack's Forge 1.20.1 cooperative downed-player syst
 ./gradlew assemble
 ```
 
-The deployable artifact is the reobfuscated `build/libs/downed_player_revival-<version>.jar` staged by `assemble`.
+The deployable artifact is the reobfuscated `build/libs/downed-player-revival-<version>.jar` staged by `stageRuntimeJar`.
 
 ## Community and support
 
