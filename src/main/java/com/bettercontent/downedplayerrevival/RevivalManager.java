@@ -7,6 +7,7 @@ import com.bettercontent.downedplayerrevival.api.event.PlayerFinishedEvent;
 import com.bettercontent.downedplayerrevival.api.event.PlayerRevivedEvent;
 import com.bettercontent.downedplayerrevival.network.RevivalNetwork;
 import com.bettercontent.downedplayerrevival.network.StateSyncPacket;
+import com.bettercontent.downedplayerrevival.state.DownedPlayerConstraints;
 import com.bettercontent.downedplayerrevival.state.RevivalState;
 import com.bettercontent.downedplayerrevival.state.RevivalTuning;
 import net.minecraft.core.Holder;
@@ -24,7 +25,6 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.network.PacketDistributor;
@@ -51,9 +51,9 @@ public final class RevivalManager {
         save(player, new RevivalState(RevivalConfig.BLEED_TICKS.get(), damageType));
         player.stopRiding();
         player.fallDistance = 0.0f;
-        player.setForcedPose(Pose.SWIMMING);
         player.setHealth(Math.min(player.getMaxHealth(), 10.0f));
         player.getFoodData().setFoodLevel(6);
+        DownedPlayerConstraints.enforce(player);
         sync(player, true);
         Component cause = source.getEntity() == null
                 ? Component.translatable("downed_player_revival.announcement.downed.cause", player.getDisplayName(), source.getLocalizedDeathMessage(player))
@@ -80,7 +80,7 @@ public final class RevivalManager {
                 RevivalConfig.GIVE_UP_HOLD_TICKS.get()
         );
 
-        player.setForcedPose(Pose.SWIMMING);
+        DownedPlayerConstraints.enforce(player);
         if (player.getFoodData().getFoodLevel() != 6) player.getFoodData().setFoodLevel(6);
         player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 10, 2, false, false, false));
         helpers.forEach(id -> {

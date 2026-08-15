@@ -7,6 +7,8 @@ import com.bettercontent.downedplayerrevival.network.FinishPacket;
 import com.bettercontent.downedplayerrevival.network.GiveUpIntentPacket;
 import com.bettercontent.downedplayerrevival.network.RevivalNetwork;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.EntityHitResult;
@@ -74,6 +76,12 @@ public final class ClientRevivalInput {
     }
 
     @SubscribeEvent
+    public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null && ClientRevivalState.isDowned(minecraft.player.getUUID())) event.setCanceled(true);
+    }
+
+    @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft minecraft = Minecraft.getInstance();
@@ -89,8 +97,16 @@ public final class ClientRevivalInput {
 
         boolean downed = ClientRevivalState.isDowned(local.getUUID());
         if (downed) {
-            minecraft.options.keyAttack.setDown(false);
-            minecraft.options.keyUse.setDown(false);
+            clearActionKey(minecraft.options.keyAttack);
+            clearActionKey(minecraft.options.keyUse);
+            clearActionKey(minecraft.options.keyJump);
+            clearActionKey(minecraft.options.keySprint);
+            clearActionKey(minecraft.options.keyInventory);
+            clearActionKey(minecraft.options.keySwapOffhand);
+            clearActionKey(minecraft.options.keyDrop);
+            clearActionKey(minecraft.options.keyPickItem);
+            for (KeyMapping hotbarKey : minecraft.options.keyHotbarSlots) clearActionKey(hotbarKey);
+            if (minecraft.screen instanceof AbstractContainerScreen<?>) minecraft.setScreen(null);
         }
         int downedTicks = ClientRevivalState.get(local.getUUID()).map(packet -> packet.downedTicks()).orElse(0);
         boolean shouldGiveUp = downed
@@ -121,5 +137,10 @@ public final class ClientRevivalInput {
     private static void stopAid() {
         if (aidTarget != null) RevivalNetwork.CHANNEL.sendToServer(new AidIntentPacket(aidTarget, false));
         aidTarget = null;
+    }
+
+    private static void clearActionKey(KeyMapping key) {
+        key.setDown(false);
+        while (key.consumeClick()) { }
     }
 }
