@@ -25,7 +25,10 @@ public final class RevivalGameTests {
 
     @GameTest(template = "empty")
     public static void authoredTimingAndDamageTypesLoad(GameTestHelper helper) {
-        if (RevivalConfig.BLEED_TICKS.get() != 1200 || RevivalConfig.REVIVE_TICKS.get() != 100) {
+        if (RevivalConfig.BLEED_TICKS.get() != 1200
+                || RevivalConfig.REVIVE_TICKS.get() != 100
+                || RevivalConfig.GIVE_UP_UNLOCK_TICKS.get() != 0
+                || RevivalConfig.GIVE_UP_HOLD_TICKS.get() != 1) {
             helper.fail("Revival authored timing defaults changed");
             return;
         }
@@ -36,7 +39,7 @@ public final class RevivalGameTests {
             return;
         }
         RevivalState state = new RevivalState(1200, "minecraft:fall");
-        RevivalTuning tuning = new RevivalTuning(100, 20, 0.5f, 100, 100);
+        RevivalTuning tuning = new RevivalTuning(100, 20, 0.5f, 0, 1);
         for (int i = 0; i < 49; i++) state.tick(2, false, tuning);
         if (state.tick(2, false, tuning) != RevivalState.TickResult.REVIVED) {
             helper.fail("Two helpers did not complete additive downed_player_revival at 50 ticks");

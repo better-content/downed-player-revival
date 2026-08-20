@@ -107,12 +107,15 @@ public final class RevivalManager {
     }
 
     public static void setAidIntent(ServerPlayer helper, UUID targetId, boolean active) {
-        removeHelper(helper.getUUID());
-        if (!active || RevivalApi.isDowned(helper)) return;
-        ServerPlayer target = helper.server.getPlayerList().getPlayer(targetId);
-        if (!validInteraction(helper, target)) return;
-        HELPERS.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(helper.getUUID());
-        sync(target, true);
+        ServerPlayer target = active && !RevivalApi.isDowned(helper)
+                ? helper.server.getPlayerList().getPlayer(targetId)
+                : null;
+        boolean valid = validInteraction(helper, target);
+        Set<UUID> changedTargets = removeHelper(helper.getUUID(), valid ? targetId : null);
+        if (valid && HELPERS.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(helper.getUUID())) {
+            changedTargets.add(targetId);
+        }
+        syncTargets(helper.server, changedTargets);
     }
 
     public static void setGiveUpIntent(ServerPlayer player, boolean active) {
@@ -141,7 +144,7 @@ public final class RevivalManager {
     }
 
     public static void onLogout(ServerPlayer player) {
-        removeHelper(player.getUUID());
+        syncTargets(player.server, removeHelper(player.getUUID(), null));
         if (RevivalApi.isDowned(player)) terminate(player, null, false);
         GIVING_UP.remove(player.getUUID());
     }
@@ -215,9 +218,24 @@ public final class RevivalManager {
         return helpers;
     }
 
-    private static void removeHelper(UUID helperId) {
-        HELPERS.values().forEach(set -> set.remove(helperId));
-        HELPERS.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+    private static Set<UUID> removeHelper(UUID helperId, UUID retainedTarget) {
+        Set<UUID> changedTargets = new HashSet<>();
+        Iterator<Map.Entry<UUID, Set<UUID>>> iterator = HELPERS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, Set<UUID>> entry = iterator.next();
+            if (!entry.getKey().equals(retainedTarget) && entry.getValue().remove(helperId)) {
+                changedTargets.add(entry.getKey());
+            }
+            if (entry.getValue().isEmpty()) iterator.remove();
+        }
+        return changedTargets;
+    }
+
+    private static void syncTargets(MinecraftServer server, Set<UUID> targetIds) {
+        targetIds.forEach(targetId -> {
+            ServerPlayer target = server.getPlayerList().getPlayer(targetId);
+            if (target != null && RevivalApi.isDowned(target)) sync(target, true);
+        });
     }
 
     private static RevivalState load(ServerPlayer player) {
@@ -232,7 +250,7 @@ public final class RevivalManager {
         player.getPersistentData().remove(RevivalState.ROOT_TAG);
         player.setForcedPose(null);
         HELPERS.remove(player.getUUID());
-        removeHelper(player.getUUID());
+        syncTargets(player.server, removeHelper(player.getUUID(), null));
         GIVING_UP.remove(player.getUUID());
         sync(player, false);
     }

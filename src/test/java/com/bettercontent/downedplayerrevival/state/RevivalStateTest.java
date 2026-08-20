@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 final class RevivalStateTest {
     private static final RevivalTuning TUNING = new RevivalTuning(100, 20, 0.5f, 100, 100);
+    private static final RevivalTuning INSTANT_GIVE_UP = new RevivalTuning(100, 20, 0.5f, 0, 1);
 
     @Test
     void unaidedPlayerBleedsOutAfterSixtySeconds() {
@@ -49,6 +50,28 @@ final class RevivalStateTest {
         RevivalState.TickResult result = RevivalState.TickResult.ACTIVE;
         for (int i = 0; i < 100; i++) result = state.tick(0, true, TUNING);
         assertEquals(RevivalState.TickResult.GAVE_UP, result);
+    }
+
+    @Test
+    void giveUpCompletesOnFirstEligibleTick() {
+        RevivalState state = new RevivalState(1200, "minecraft:fall");
+        assertEquals(RevivalState.TickResult.GAVE_UP, state.tick(0, true, INSTANT_GIVE_UP));
+    }
+
+    @Test
+    void instantGiveUpStillRequiresInput() {
+        RevivalState state = new RevivalState(1200, "minecraft:fall");
+        assertEquals(RevivalState.TickResult.ACTIVE, state.tick(0, false, INSTANT_GIVE_UP));
+    }
+
+    @Test
+    void giveUpWinsSameTickReviveAndBleedOut() {
+        RevivalState reviveReady = new RevivalState(1200, "minecraft:fall");
+        for (int i = 0; i < 99; i++) reviveReady.tick(1, false, INSTANT_GIVE_UP);
+        assertEquals(RevivalState.TickResult.GAVE_UP, reviveReady.tick(1, true, INSTANT_GIVE_UP));
+
+        RevivalState bleedOutReady = new RevivalState(1, "minecraft:fall");
+        assertEquals(RevivalState.TickResult.GAVE_UP, bleedOutReady.tick(0, true, INSTANT_GIVE_UP));
     }
 
     @Test

@@ -59,7 +59,10 @@ public final class RevivalHud {
                     state.giveUpTicks() / (float) RevivalConfig.GIVE_UP_HOLD_TICKS.get(), 0xFF742929);
             graphics.drawCenteredString(minecraft.font, Component.translatable("downed_player_revival.hud.giving_up"), center, y + 28, WHITE);
         } else {
-            graphics.drawCenteredString(minecraft.font, Component.translatable("downed_player_revival.hud.give_up"), center, y + 25, MUTED);
+            String key = RevivalConfig.GIVE_UP_HOLD_TICKS.get() <= 1
+                    ? "downed_player_revival.hud.give_up_instant"
+                    : "downed_player_revival.hud.give_up";
+            graphics.drawCenteredString(minecraft.font, Component.translatable(key), center, y + 25, MUTED);
         }
     }
 

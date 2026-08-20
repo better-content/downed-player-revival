@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = RevivalMod.MOD_ID, value = Dist.CLIENT)
 public final class ClientRevivalInput {
-    private static UUID aidTarget;
+    private static final AidIntentState AID_INTENT = new AidIntentState();
     private static boolean giveUpActive;
 
     private ClientRevivalInput() {}
@@ -36,21 +36,6 @@ public final class ClientRevivalInput {
 
         if (ClientRevivalState.isDowned(local.getUUID())) {
             if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT || event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-                event.setCanceled(true);
-            }
-            return;
-        }
-
-        if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-            if (event.getAction() == GLFW.GLFW_RELEASE && aidTarget != null) {
-                stopAid();
-                event.setCanceled(true);
-                return;
-            }
-            Player target = targetedDownedPlayer(minecraft);
-            if (event.getAction() == GLFW.GLFW_PRESS && target != null) {
-                aidTarget = target.getUUID();
-                RevivalNetwork.CHANNEL.sendToServer(new AidIntentPacket(aidTarget, true));
                 event.setCanceled(true);
             }
             return;
@@ -72,7 +57,14 @@ public final class ClientRevivalInput {
     @SubscribeEvent
     public static void onInteraction(InputEvent.InteractionKeyMappingTriggered event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null && ClientRevivalState.isDowned(minecraft.player.getUUID())) event.setCanceled(true);
+        Player local = minecraft.player;
+        if (local == null) return;
+        if (ClientRevivalState.isDowned(local.getUUID())) {
+            event.setCanceled(true);
+        } else if (event.isUseItem() && targetedDownedPlayer(minecraft) != null) {
+            event.setSwingHand(false);
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
@@ -89,13 +81,11 @@ public final class ClientRevivalInput {
         Player local = minecraft.player;
         if (local == null) return;
 
-        if (aidTarget != null) {
-            boolean rightHeld = GLFW.glfwGetMouseButton(minecraft.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
-            Player aimedAt = targetedDownedPlayer(minecraft);
-            if (!rightHeld || !ClientRevivalState.isDowned(aidTarget) || aimedAt == null || !aimedAt.getUUID().equals(aidTarget)) stopAid();
-        }
-
         boolean downed = ClientRevivalState.isDowned(local.getUUID());
+        Player aimedAt = !downed && minecraft.screen == null && minecraft.options.keyUse.isDown()
+                ? targetedDownedPlayer(minecraft)
+                : null;
+        updateAid(aimedAt == null ? null : aimedAt.getUUID());
         if (downed) {
             clearActionKey(minecraft.options.keyAttack);
             clearActionKey(minecraft.options.keyUse);
@@ -118,14 +108,14 @@ public final class ClientRevivalInput {
         }
     }
 
-    public static UUID aidTarget() { return aidTarget; }
+    public static UUID aidTarget() { return AID_INTENT.target(); }
 
     public static void targetCleared(UUID playerId) {
-        if (playerId.equals(aidTarget)) stopAid();
+        if (playerId.equals(AID_INTENT.target())) updateAid(null);
     }
 
     public static void reset() {
-        aidTarget = null;
+        AID_INTENT.reset();
         giveUpActive = false;
     }
 
@@ -134,9 +124,10 @@ public final class ClientRevivalInput {
         return ClientRevivalState.isDowned(target.getUUID()) ? target : null;
     }
 
-    private static void stopAid() {
-        if (aidTarget != null) RevivalNetwork.CHANNEL.sendToServer(new AidIntentPacket(aidTarget, false));
-        aidTarget = null;
+    private static void updateAid(UUID desiredTarget) {
+        for (AidIntentState.Update update : AID_INTENT.update(desiredTarget)) {
+            RevivalNetwork.CHANNEL.sendToServer(new AidIntentPacket(update.targetId(), update.active()));
+        }
     }
 
     private static void clearActionKey(KeyMapping key) {

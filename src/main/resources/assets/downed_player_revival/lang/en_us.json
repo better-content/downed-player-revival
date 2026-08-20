@@ -3,6 +3,7 @@
   "downed_player_revival.hud.time": "%s remaining",
   "downed_player_revival.hud.give_up_locked": "You can give up in %s",
   "downed_player_revival.hud.give_up": "Hold Sneak to give up",
+  "downed_player_revival.hud.give_up_instant": "Press Sneak to give up",
   "downed_player_revival.hud.giving_up": "Giving up",
   "downed_player_revival.hud.reviving": "Reviving %s",
   "downed_player_revival.hud.helpers": "%s helping",

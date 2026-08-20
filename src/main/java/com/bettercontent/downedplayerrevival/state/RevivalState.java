@@ -36,8 +36,8 @@ public final class RevivalState {
             giveUpTicks = 0;
         }
 
-        if (reviveProgress >= tuning.reviveTicks()) return TickResult.REVIVED;
         if (giveUpTicks >= tuning.giveUpHoldTicks()) return TickResult.GAVE_UP;
+        if (reviveProgress >= tuning.reviveTicks()) return TickResult.REVIVED;
         if (ticksLeft <= 0) return TickResult.BLED_OUT;
         return TickResult.ACTIVE;
     }

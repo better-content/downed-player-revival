@@ -32,9 +32,9 @@ public final class RevivalConfig {
         HELPER_EXHAUSTION_PER_TICK = builder.comment("Exhaustion charged to each active helper per tick.")
                 .defineInRange("helperExhaustionPerTick", 0.5, 0.0, 10.0);
         GIVE_UP_UNLOCK_TICKS = builder.comment("Downed ticks before give-up input becomes available.")
-                .defineInRange("giveUpUnlockTicks", 100, 0, 1200);
+                .defineInRange("giveUpUnlockTicks", 0, 0, 1200);
         GIVE_UP_HOLD_TICKS = builder.comment("Continuous Sneak-hold ticks required to give up.")
-                .defineInRange("giveUpHoldTicks", 100, 20, 1200);
+                .defineInRange("giveUpHoldTicks", 1, 1, 1200);
         REVIVED_HEALTH_HALF_HEARTS = builder.comment("Health after downed_player_revival, measured in half-hearts.")
                 .defineInRange("revivedHealthHalfHearts", 2, 1, 40);
         RECOVERY_TICKS = builder.comment("Weakness and slowness duration after downed_player_revival.")
