@@ -13,14 +13,18 @@ import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.Locale;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = RevivalMod.MOD_ID, value = Dist.CLIENT)
 public final class RevivalHud {
     private static final int WHITE = 0xFFF4F4F4;
     private static final int MUTED = 0xFFB7AAA8;
-    private static final int RED = 0xFF9E3434;
+    private static final int RED = 0xFFE66A70;
+    private static final int CRITICAL = 0xFFFFD166;
+    private static final int FRAME_DARK = 0xD018090B;
+    private static final int FRAME_RED = 0xD09E2932;
+    private static final int PANEL = 0xE8120E10;
+    private static final int PANEL_INNER = 0xD02A1417;
 
     private RevivalHud() {}
 
@@ -37,33 +41,99 @@ public final class RevivalHud {
     private static void renderDowned(GuiGraphics graphics, Minecraft minecraft, StateSyncPacket state) {
         int width = minecraft.getWindow().getGuiScaledWidth();
         int height = minecraft.getWindow().getGuiScaledHeight();
-        graphics.fill(0, 0, width, 10, 0x48000000);
-        graphics.fill(0, height - 10, width, height, 0x48000000);
-        graphics.fill(0, 0, 10, height, 0x38000000);
-        graphics.fill(width - 10, 0, width, height, 0x38000000);
+        RevivalHudPresentation.View view = RevivalHudPresentation.resolve(
+                state.ticksLeft(),
+                state.downedTicks(),
+                state.reviveProgress(),
+                state.helperCount(),
+                state.giveUpTicks(),
+                RevivalConfig.REVIVE_TICKS.get(),
+                RevivalConfig.GIVE_UP_UNLOCK_TICKS.get(),
+                RevivalConfig.GIVE_UP_HOLD_TICKS.get()
+        );
+
+        drawEdgeFrame(graphics, width, height, view.banner() == RevivalHudPresentation.BannerState.CRITICAL);
 
         int center = width / 2;
-        int y = height - 116;
-        graphics.fill(center - 86, y - 6, center + 86, y + 40, 0xA8101010);
-        graphics.fill(center - 85, y - 5, center + 85, y + 39, 0x70271212);
-        graphics.drawCenteredString(minecraft.font, Component.translatable("downed_player_revival.hud.downed"), center, y, RED);
+        int bannerWidth = Math.min(300, Math.max(120, width - 24));
+        int bannerLeft = center - bannerWidth / 2;
+        int bannerRight = bannerLeft + bannerWidth;
+        graphics.fill(bannerLeft - 2, 9, bannerRight + 2, 51, FRAME_DARK);
+        graphics.fill(bannerLeft, 11, bannerRight, 49, PANEL_INNER);
+        graphics.fill(bannerLeft, 11, bannerRight, 14,
+                view.banner() == RevivalHudPresentation.BannerState.CRITICAL ? CRITICAL : FRAME_RED);
         graphics.drawCenteredString(minecraft.font,
-                Component.translatable("downed_player_revival.hud.time", formatTicks(state.ticksLeft())), center, y + 12, WHITE);
+                Component.translatable("downed_player_revival.hud.you_are_downed"), center, 18, WHITE);
+        graphics.drawCenteredString(minecraft.font, Component.translatable(bannerSubtitle(view)), center, 29,
+                view.banner() == RevivalHudPresentation.BannerState.CRITICAL ? CRITICAL : RED);
+        graphics.drawCenteredString(minecraft.font,
+                Component.translatable("downed_player_revival.hud.time",
+                        RevivalHudPresentation.formatTicks(view.ticksLeft())), center, 40, WHITE);
 
-        int unlock = RevivalConfig.GIVE_UP_UNLOCK_TICKS.get();
-        if (state.downedTicks() < unlock) {
+        int panelWidth = Math.min(272, Math.max(120, width - 24));
+        int panelHeight = view.reviving() ? 68 : 50;
+        int panelLeft = center - panelWidth / 2;
+        int panelTop = Math.max(58, height - panelHeight - 42);
+        graphics.fill(panelLeft - 2, panelTop - 2, panelLeft + panelWidth + 2, panelTop + panelHeight + 2, PANEL);
+        graphics.fill(panelLeft, panelTop, panelLeft + panelWidth, panelTop + panelHeight, PANEL_INNER);
+
+        int contentY = panelTop + 7;
+        if (view.reviving()) {
+            int barWidth = Math.max(80, panelWidth - 28);
+            drawBar(graphics, center - barWidth / 2, contentY, barWidth, view.reviveProgress(), 0xFF7CC6A6);
             graphics.drawCenteredString(minecraft.font,
-                    Component.translatable("downed_player_revival.hud.give_up_locked", formatTicks(unlock - state.downedTicks())), center, y + 25, MUTED);
-        } else if (state.giveUpTicks() > 0) {
-            drawBar(graphics, center - 70, y + 26, 140,
-                    state.giveUpTicks() / (float) RevivalConfig.GIVE_UP_HOLD_TICKS.get(), 0xFF742929);
-            graphics.drawCenteredString(minecraft.font, Component.translatable("downed_player_revival.hud.giving_up"), center, y + 28, WHITE);
+                    Component.translatable("downed_player_revival.hud.revive_progress",
+                            Math.round(view.reviveProgress() * 100.0f)), center, contentY + 1, WHITE);
+            if (view.helperCount() > 1) {
+                graphics.drawCenteredString(minecraft.font,
+                        Component.translatable("downed_player_revival.hud.helpers", view.helperCount()), center,
+                        contentY + 13, MUTED);
+            } else {
+                graphics.drawCenteredString(minecraft.font,
+                        Component.translatable("downed_player_revival.hud.one_helper"), center, contentY + 13, MUTED);
+            }
+            contentY += 30;
+        } else {
+            graphics.drawCenteredString(minecraft.font,
+                    Component.translatable("downed_player_revival.hud.wait_for_help"), center, contentY, WHITE);
+            contentY += 17;
+        }
+
+        if (view.giveUp() == RevivalHudPresentation.GiveUpState.LOCKED) {
+            graphics.drawCenteredString(minecraft.font,
+                    Component.translatable("downed_player_revival.hud.give_up_locked",
+                            RevivalHudPresentation.formatTicks(view.giveUpLockedTicks())), center, contentY, MUTED);
+        } else if (view.giveUp() == RevivalHudPresentation.GiveUpState.HOLDING) {
+            int barWidth = Math.max(80, panelWidth - 28);
+            drawBar(graphics, center - barWidth / 2, contentY - 2, barWidth, view.giveUpProgress(), 0xFF9E343C);
+            graphics.drawCenteredString(minecraft.font,
+                    Component.translatable("downed_player_revival.hud.giving_up"), center, contentY - 1, WHITE);
         } else {
             String key = RevivalConfig.GIVE_UP_HOLD_TICKS.get() <= 1
                     ? "downed_player_revival.hud.give_up_instant"
                     : "downed_player_revival.hud.give_up";
-            graphics.drawCenteredString(minecraft.font, Component.translatable(key), center, y + 25, MUTED);
+            graphics.drawCenteredString(minecraft.font, Component.translatable(key), center, contentY, MUTED);
         }
+    }
+
+    private static String bannerSubtitle(RevivalHudPresentation.View view) {
+        return switch (view.banner()) {
+            case DOWNED -> "downed_player_revival.hud.wait_for_help";
+            case REVIVING -> "downed_player_revival.hud.revival_in_progress";
+            case CRITICAL -> "downed_player_revival.hud.bleeding_out";
+        };
+    }
+
+    private static void drawEdgeFrame(GuiGraphics graphics, int width, int height, boolean critical) {
+        int accent = critical ? CRITICAL : FRAME_RED;
+        graphics.fill(0, 0, width, 8, FRAME_DARK);
+        graphics.fill(0, height - 8, width, height, FRAME_DARK);
+        graphics.fill(0, 0, 8, height, FRAME_DARK);
+        graphics.fill(width - 8, 0, width, height, FRAME_DARK);
+        graphics.fill(0, 0, width, 3, accent);
+        graphics.fill(0, height - 3, width, height, accent);
+        graphics.fill(0, 0, 3, height, accent);
+        graphics.fill(width - 3, 0, width, height, accent);
     }
 
     private static void renderAid(GuiGraphics graphics, Minecraft minecraft) {
@@ -90,8 +160,4 @@ public final class RevivalHud {
         graphics.fill(x, y, x + Math.round(width * bounded), y + 9, color);
     }
 
-    private static String formatTicks(int ticks) {
-        int seconds = Math.max(0, (ticks + 19) / 20);
-        return String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60);
-    }
 }

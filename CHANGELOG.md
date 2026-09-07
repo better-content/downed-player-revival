@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Made the local downed state unmistakable with a persistent screen frame, prominent banner and timer, explicit revival and critical states, and labeled give-up status without flashing or color-only cues.
 - Made held Use Item revival binding-aware and self-refreshing so acquiring a target late or a transient server rejection no longer leaves aid stalled.
 - Made the authored Sneak give-up action available immediately while retaining configurable unlock and hold durations.
 - Made downed-player constraints consistently server-authoritative across item use, containers, block breaking, item and experience pickup, dropping, mounting, sprinting, jumping, and flight.

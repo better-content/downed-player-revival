@@ -7,6 +7,12 @@ Revival is the Better Content pack's Forge 1.20.1 cooperative downed-player syst
 - Hold the configured **Use Item** binding while aiming at a downed player to revive them. The aid intent follows the binding and automatically recovers from transient server-side range, sight, or facing rejection while the target remains valid.
 - Press **Sneak** while downed to give up immediately. Servers may configure an unlock delay or longer hold if desired.
 
+## Downed HUD
+
+While downed, the local player sees a persistent high-contrast screen frame, a **YOU ARE DOWNED** banner, the bleed-out timer, and a bottom action panel. The presentation distinguishes waiting, active revival, the final ten-second critical period, give-up lock/ready/hold states, and disappears as soon as revival state clears. Every state has a text label and numeric or filled progress indicator; color is supplemental and the HUD does not flash.
+
+The helper-facing targeted revival HUD is unchanged. The mod does not add teammate beacons or global rescue markers.
+
 ## Build and verification
 
 ```text
