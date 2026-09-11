@@ -2,7 +2,7 @@ plugins {
     idea
     jacoco
     `maven-publish`
-    id("net.minecraftforge.gradle") version "[6.0.24,6.2)"
+    id("net.minecraftforge.gradle") version "6.0.54"
 }
 
 group = property("mod_group_id") as String
