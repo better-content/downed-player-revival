@@ -73,6 +73,7 @@ review worlds for state-changing scenarios:
 
 ```text
 downedplayerrevival debug gui PLAYER inventory
+downedplayerrevival debug gui PLAYER own-body
 downedplayerrevival debug gui VIEWER body SUBJECT LEFT_ARM active 0
 downedplayerrevival debug gui VIEWER body SUBJECT LEFT_LEG history 2
 downedplayerrevival debug gui PLAYER body-view regions 0
@@ -92,6 +93,8 @@ downedplayerrevival debug presentation PLAYER true false
 Fixture names include `healthy`, `mixed`, `severe`, `missing_medicine`, `long_history`,
 `healing_lock`, `trauma_expiry`, and `final_death`. The final-death fixture runs real death.
 Commands invoke production screens and handlers; they do not simulate player input.
+`gui PLAYER own-body` invokes the same client-to-server overview request as the inventory Body
+button and shared `openOwnBody` entry point. Explicit region/history commands still select detail.
 
 `pressure PLAYER MAIMS AT_DOOR MAX_HP` creates real server-owned leg injuries and health,
 then reports the actual configured death probability. `presentation PLAYER REDUCED_MOTION SOUND`

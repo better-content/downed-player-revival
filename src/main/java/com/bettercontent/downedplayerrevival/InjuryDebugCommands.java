@@ -16,6 +16,7 @@ public final class InjuryDebugCommands {
  @SubscribeEvent public static void register(RegisterCommandsEvent event){register(event.getDispatcher());}
  public static void register(CommandDispatcher<CommandSourceStack> dispatcher){
   var gui=literal("gui").then(argument("viewer",EntityArgument.player())
+   .then(literal("own-body").executes(c->{RevivalNetwork.send(EntityArgument.getPlayer(c,"viewer"),new UiControlPacket("own-body","",0,0));return 1;}))
    .then(literal("inventory").executes(c->{RevivalNetwork.send(EntityArgument.getPlayer(c,"viewer"),new UiControlPacket("inventory","",0,0));return 1;}))
    .then(literal("body").then(argument("subject",EntityArgument.player()).executes(c->{RevivalManager.openBody(EntityArgument.getPlayer(c,"viewer"),EntityArgument.getPlayer(c,"subject"));return 1;})
     .then(argument("region",StringArgumentType.word()).suggests((c,b)->SharedSuggestionProvider.suggest(java.util.Arrays.stream(Region.values()).map(Enum::name),b))

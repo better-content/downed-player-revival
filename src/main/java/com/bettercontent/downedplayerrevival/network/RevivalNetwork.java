@@ -7,7 +7,7 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.*;
 public final class RevivalNetwork {
- private static final String PROTOCOL="2";
+ private static final String PROTOCOL="3";
  public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(new ResourceLocation(RevivalMod.MOD_ID,"main"),()->PROTOCOL,PROTOCOL::equals,PROTOCOL::equals);
  private record Viewing(UUID subject,Region region,boolean history,int page){}
  private static final Map<UUID,Viewing> VIEWERS=new HashMap<>();
