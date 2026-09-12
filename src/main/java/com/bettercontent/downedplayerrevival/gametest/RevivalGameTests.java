@@ -317,6 +317,21 @@ public final class RevivalGameTests {
         });
     }
 
+    @GameTest(template = "empty", timeoutTicks = 130)
+    public static void acceptedAbsorbedHitPublishesOnlyExistingInjuryAmplification(GameTestHelper helper) {
+        Fixture f = new Fixture(helper);
+        f.atReady(() -> {
+            f.player.setAbsorptionAmount(10);
+            require(f.player.hurt(f.player.damageSources().generic(), 1), "Absorbed hit not accepted");
+            require(f.probe.traumas == 1 && f.probe.amplifications == 0, "Healthy hit claimed an existing injury");
+            RevivalManager.state(f.player).addMaim(Region.LEFT_ARM, MaimType.CRACKED, RevivalManager.now(f.player));
+            f.player.invulnerableTime = 0;
+            require(f.player.hurt(f.player.damageSources().generic(), 1), "Second absorbed hit not accepted");
+            require(f.probe.traumas == 2 && f.probe.amplifications == 1, "Absorbed hit did not publish existing arm amplification");
+            require(RevivalManager.state(f.player).activeMaims().size() == 1, "Absorbed hit added an injury");
+        });
+    }
+
     private static void require(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
     private static void close(double actual, double expected, String message) { require(Math.abs(actual - expected) < .00001, message + " (expected " + expected + ", got " + actual + ")"); }
 
@@ -361,7 +376,7 @@ public final class RevivalGameTests {
     }
     public static final class DeathProbe {
         final ServerPlayer player;
-        int deaths, finalDeaths, xpAtDeath, recapMaims;
+        int deaths, finalDeaths, xpAtDeath, recapMaims, traumas, amplifications;
         DamageSource source, finalSource;
         boolean cancel;
         DeathProbe(ServerPlayer player) { this.player = player; }
@@ -370,6 +385,11 @@ public final class RevivalGameTests {
             if (event.getEntity() != player) return;
             if (cancel) { event.setCanceled(true); return; }
             deaths++; source = event.getSource(); xpAtDeath = player.experienceLevel;
+        }
+        @SubscribeEvent public void trauma(InjuryEvent.TraumaIncreased event) {
+            if(event.getEntity()!=player)return;
+            traumas++;
+            if(event.amplifiedExistingInjury())amplifications++;
         }
         @SubscribeEvent
         public void finalized(InjuryEvent.FinalDeath event) {

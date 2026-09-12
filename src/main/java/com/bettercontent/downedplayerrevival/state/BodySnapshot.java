@@ -21,6 +21,16 @@ public record BodySnapshot(UUID playerId, float health, float maxHealth, boolean
         return new BodySnapshot(id, state.atDoor() ? 0 : health, maxHealth, state.atDoor(),
             state.healingLockedUntil(), now, state.activeMaims(), state.treatmentHistory(), state.traumaCount(now));
     }
+    /** Compare only the pre-hit injury set, never attribute a newly added maim to trauma. */
+    public boolean traumaAmplifies(BodySnapshot before) {
+        if (traumaCount <= before.traumaCount || !playerId.equals(before.playerId)) return false;
+        BodySnapshot sameInjuries = new BodySnapshot(playerId, health, maxHealth, atDoor,
+            healingLockedUntil, serverTick, before.activeMaims, before.treatmentHistory, traumaCount, before.tuning);
+        for (Region region : Region.values())
+            if (region != Region.HEAD && before.count(region) > 0
+                && sameInjuries.regionalReduction(region) > before.regionalReduction(region)) return true;
+        return false;
+    }
     public int count(Region region) { return (int) activeMaims.stream().filter(m -> m.region() == region).count(); }
     public double deathProbability() { return BodyRules.deathProbability(activeMaims.size(), count(Region.HEAD), tuning); }
     public double functionalMultiplier() { return BodyRules.functionalMultiplier(traumaCount, tuning); }

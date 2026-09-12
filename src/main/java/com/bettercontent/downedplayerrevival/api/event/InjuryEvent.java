@@ -17,6 +17,17 @@ public abstract class InjuryEvent extends PlayerEvent {
         public EnteredDoor(ServerPlayer p, BodySnapshot s, DamageSource source) { super(p, s); this.source = source; }
         public DamageSource source() { return source; }
     }
+    /** Accepted-hit trauma, captured before adding this hit's possible new maim. */
+    public static final class TraumaIncreased extends InjuryEvent {
+        private final BodySnapshot before;
+        private final DamageSource source;
+        public TraumaIncreased(ServerPlayer player, BodySnapshot before, BodySnapshot after, DamageSource source) {
+            super(player, after); this.before = before; this.source = source;
+        }
+        public BodySnapshot before() { return before; }
+        public DamageSource source() { return source; }
+        public boolean amplifiedExistingInjury() { return snapshot().traumaAmplifies(before); }
+    }
     public static final class Healed extends InjuryEvent { public Healed(ServerPlayer p, BodySnapshot s) { super(p, s); } }
     public static final class MaimAdded extends InjuryEvent {
         private final Maim maim;

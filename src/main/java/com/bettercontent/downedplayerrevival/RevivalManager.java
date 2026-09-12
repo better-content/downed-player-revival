@@ -91,8 +91,12 @@ public final class RevivalManager {
     public static void acceptedHit(ServerPlayer p, DamageSource source) {
         if (!eligible(p)) return;
         interruptParticipant(p, "Treatment interrupted: damage taken");
+        BodySnapshot before = snapshot(p);
         state(p).addTrauma(now(p), RevivalConfig.tuning());
         DIRTY.add(p);
+        BodySnapshot after = snapshot(p);
+        if (after.traumaCount() > before.traumaCount())
+            MinecraftForge.EVENT_BUS.post(new InjuryEvent.TraumaIncreased(p, before, after, source));
     }
     public static void applyDamageHealth(ServerPlayer p, DamageSource source, float proposed) {
         if (!eligible(p) || bypasses(source)) { setHealthInternal(p, proposed); return; }

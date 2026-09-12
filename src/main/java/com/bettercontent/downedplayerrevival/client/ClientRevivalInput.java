@@ -14,6 +14,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid=RevivalMod.MOD_ID,value=Dist.CLIENT)
 public final class ClientRevivalInput {
+ /** Request a fresh authoritative view, including current treatment supplies. */
+ public static void openOwnBody(){var player=Minecraft.getInstance().player;if(player!=null)RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(player.getUUID(),0,0,0,0,false));}
  @SubscribeEvent public static void logout(ClientPlayerNetworkEvent.LoggingOut event){ClientRevivalState.clear();}
  @SubscribeEvent public static void inventory(ScreenEvent.Init.Post event){if(event.getScreen() instanceof InventoryScreen screen){int x=Math.max(3,(screen.width-176)/2-49),y=(screen.height-166)/2;event.addListener(Button.builder(Component.literal("Body"),button->{var player=Minecraft.getInstance().player;if(player!=null)RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(player.getUUID(),0,0,0,0,false));}).bounds(x,y,46,20).build());}}
  @SubscribeEvent public static void inventoryIcon(ScreenEvent.Render.Post event){if(event.getScreen() instanceof InventoryScreen screen){int x=Math.max(3,(screen.width-176)/2-49)+3,y=(screen.height-166)/2+3;var g=event.getGuiGraphics();int c=0xFFA8CEB2;g.fill(x+3,y,x+6,y+3,c);g.fill(x+2,y+4,x+7,y+9,c);g.fill(x,y+4,x+1,y+10,c);g.fill(x+8,y+4,x+9,y+10,c);g.fill(x+2,y+10,x+4,y+14,c);g.fill(x+5,y+10,x+7,y+14,c);}}
