@@ -20,6 +20,7 @@ public final class ClientRevivalState {
   if(packet.mode()==3&&mc.screen instanceof BodyScreen screen&&screen.body().playerId().equals(body.playerId()))screen.update(body);
  }
  public static void control(UiControlPacket packet){var mc=Minecraft.getInstance();switch(packet.operation()){
+  case "body-view"->{if(mc.screen instanceof BodyScreen screen)screen.showPage(packet.text(),packet.delay());}
   case "presentation"->{InjuryClientConfig.REDUCED_MOTION.set(packet.progress()>0);InjuryClientConfig.SOUND.set(Boolean.parseBoolean(packet.text()));}
   case "inventory"->{if(mc.player!=null)mc.setScreen(new InventoryScreen(mc.player));}
   case "capture"->{captureLabel=packet.text().replaceAll("[^a-zA-Z0-9_-]","_");captureDelay=Math.max(2,Math.min(200,packet.delay()));}

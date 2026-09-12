@@ -75,9 +75,13 @@ review worlds for state-changing scenarios:
 downedplayerrevival debug gui PLAYER inventory
 downedplayerrevival debug gui VIEWER body SUBJECT LEFT_ARM active 0
 downedplayerrevival debug gui VIEWER body SUBJECT LEFT_LEG history 2
+downedplayerrevival debug gui PLAYER body-view regions 0
+downedplayerrevival debug gui PLAYER body-view help 0
+downedplayerrevival debug gui PLAYER body-view detail 120
 downedplayerrevival debug gui PLAYER death-recap
 downedplayerrevival debug gui PLAYER close
 downedplayerrevival debug scenario PLAYER mixed
+downedplayerrevival debug maim PLAYER LEFT_ARM BURNT
 downedplayerrevival debug treatment start HEALER SUBJECT LEFT_ARM OPENED
 downedplayerrevival debug treatment cancel HEALER
 downedplayerrevival debug capture PLAYER review-label 12
@@ -124,6 +128,11 @@ Screenshots are saved in `build/injury-visual/screenshots/` and
 `build/injury-helper/screenshots/`. For a persistent console-driven review, set
 `INJURY_REVIEW_MANUAL=1` on the primary; write one production server command per line to
 `build/injury-visual/review.commands`. The harness consumes that file on the server thread.
+A harness-only line `viewport 1920 1080 3` changes the actual window and GUI scale.
+`body-view` selects the region picker, help, or detail view; its final argument is a pixel scroll
+offset through the actual screen content. The visible Region, Help and tab buttons use the same
+navigation. Normal entry opens the six-region overview. Only active injury types appear in the treatment list; small screens scroll complete
+treatment cards and history records rather than compressing them.
 A line containing `stop` ends the primary. No mouse, key, or player-control events are synthesized.
 
 On lanes without a display, an isolated user-namespace Xvfb avoids system temporary files:

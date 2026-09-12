@@ -3,216 +3,210 @@ package com.bettercontent.downedplayerrevival.client;
 import com.bettercontent.downedplayerrevival.InjuryItems;
 import com.bettercontent.downedplayerrevival.network.*;
 import com.bettercontent.downedplayerrevival.state.*;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import java.util.*;
 
-/** Production treatment screen. Operator selection uses the same view and action paths. */
+/** A focused treatment view, with separate region selection and explanations. */
 public final class BodyScreen extends Screen {
     public static final int PAPER = 0xF0181D23, INK = 0xFFF0E9DC, MUTED = 0xFFA5B2B9;
     public static final int RED = 0xFFED9E91, GREEN = 0xFFA8CEB2;
     private BodyView body;
     private Region selected;
-    private boolean history;
+    private boolean history, choosingRegion, help;
     private float progress;
-    private String status = "";
-    private int left, right, detail, panelHeight, offsetY;
-    private final List<Button> treatments = new ArrayList<>();
+    private String status = "", helpReturn = "detail";
+    private int statusTicks;
+    private int left, top, panelWidth, panelHeight, scroll;
+    private final Map<MaimType, Button> treatments = new EnumMap<>(MaimType.class);
     private final Map<Region, Button> regions = new EnumMap<>(Region.class);
-    private Button done;
+    private Button done, previousHistory, nextHistory;
 
     public BodyScreen(BodyView body, Region selected, boolean history) {
         super(Component.literal("Body & treatment"));
-        this.body = body;
-        this.selected = selected;
-        this.history = history;
+        this.body = body; this.selected = selected; this.history = history;
     }
-
     public BodyView body() { return body; }
-    public void update(BodyView body) { this.body = body; updateButtons(); }
-    public void treatment(float progress, String message) {
-        this.progress = progress >= 1 ? 0 : progress;
-        status = message;
-        updateButtons();
+    public void update(BodyView next) {
+        boolean changed = !activeTypes().equals(Arrays.stream(MaimType.values()).filter(t -> next.region(selected).count(t) > 0).toList());
+        body = next;
+        int previousScroll = scroll; scroll = Math.min(scroll, maxScroll());
+        if (changed || scroll != previousScroll) { rebuildWidgets(); }
+        else updateButtons();
+    }
+    public void treatment(float value, String message) {
+        progress = value >= 1 ? 0 : value; status = message; statusTicks = 100; updateButtons();
     }
     public void applySelection(Region region, boolean history) {
-        if (selected != region || this.history != history) {
-            selected = region;
-            this.history = history;
-            rebuildWidgets();
+        if (selected != region || this.history != history || choosingRegion || help) {
+            selected = region; this.history = history; choosingRegion = help = false; scroll = 0; rebuildWidgets();
         }
     }
-    public void select(Region region, boolean history, int page) {
-        selected = region;
-        this.history = history;
+    private void select(Region region, boolean history, int page) {
+        selected = region; this.history = history; choosingRegion = help = false; scroll = 0;
+        if (progress <= 0) status = "";
         RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 0, region.ordinal(), 0, page, history));
         rebuildWidgets();
     }
-
+    /** Console controls use the same navigation as the visible buttons. */
+    public void showPage(String page, int offset) {
+        if (page.equals("help") && !help) helpReturn = choosingRegion ? "regions" : "detail";
+        choosingRegion = page.equals("regions"); help = page.equals("help");
+        if (progress <= 0) status = "";
+        scroll = Math.max(0, Math.min(offset, maxScroll())); rebuildWidgets();
+    }
     @Override protected void init() {
-        left = Math.max(8, (width - 540) / 2);
-        right = width - left;
-        panelHeight = Math.min(height, 300);
-        offsetY = (height - panelHeight) / 2;
-        detail = left + Math.max(110, Math.min(154, (right - left) / 3));
-        done = addButton("Done", right - 53, 15, 43, 18, b -> onClose());
-        regions.clear();
-        int rowHeight = regionHeight();
-        for (Region region : Region.values()) {
-            var button = new RegionButton(left + 37, offsetY + 92 + region.ordinal() * rowHeight,
-                detail - left - 44, rowHeight - 2, region, b -> select(region, false, 0));
-            regions.put(region, addRenderableWidget(button));
+        panelWidth = Math.min(500, width - 24); panelHeight = Math.min(390, height - 16);
+        left = (width - panelWidth) / 2; top = (height - panelHeight) / 2;
+        scroll = Math.min(scroll, maxScroll());
+        treatments.clear(); regions.clear(); previousHistory = nextHistory = null;
+        done = button("Done", panelWidth - 58, 12, 44, 20, b -> onClose());
+        button(help ? "Back" : "Help", panelWidth - 108, 12, 44, 20, b -> showPage(help ? helpReturn : "help", 0));
+        if (help) return;
+        if (choosingRegion) {
+            Region[] order = {Region.HEAD, Region.TORSO, Region.LEFT_ARM, Region.RIGHT_ARM, Region.LEFT_LEG, Region.RIGHT_LEG};
+            int buttonWidth = (panelWidth - 76) / 2;
+            for (int i = 0; i < order.length; i++) {
+                Region region = order[i];
+                regions.put(region, button(BodyView.label(region) + " (" + body.region(region).total() + ")",
+                    i % 2 == 0 ? 14 : panelWidth - 14 - buttonWidth, 80 + (i / 2) * 36,
+                    buttonWidth, 26, b -> select(region, false, 0)));
+            }
+            return;
         }
-        int tabWidth = (right - detail - 13) / 2;
-        addButton("Active injuries", detail, 68, tabWidth, 19, b -> select(selected, false, 0));
-        addButton("History", detail + tabWidth + 3, 68, tabWidth, 19, b -> select(selected, true, 0));
-        treatments.clear();
+        button("Region: " + BodyView.label(selected), 14, 55, panelWidth - 166, 22, b -> showPage("regions", 0));
+        button("Injuries", panelWidth - 144, 55, 62, 22, b -> select(selected, false, 0)).active = history;
+        button("History", panelWidth - 76, 55, 62, 22, b -> select(selected, true, 0)).active = !history;
         if (!history) {
-            for (MaimType type : MaimType.values()) {
-                treatments.add(addButton("Apply " + InjuryItems.cureName(type), right - 111,
-                    BodyLayout.CURE_TOP + type.ordinal() * treatmentRowHeight(), 101, 19,
-                    b -> RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 1,
-                        selected.ordinal(), type.ordinal(), 0, false))));
+            List<MaimType> types = activeTypes();
+            for (int i = 0; i < types.size(); i++) {
+                MaimType type = types.get(i);
+                treatments.put(type, button("Apply " + InjuryItems.cureName(type), panelWidth - 126,
+                    contentTop() + i * 76 - scroll + 12, 98, 22,
+                    b -> RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 1, selected.ordinal(), type.ordinal(), 0, false))));
             }
         } else {
-            addButton("Previous", detail, panelHeight - 54, 65, 18,
-                b -> select(selected, true, Math.max(0, body.historyPage() - 1))).active = body.historyPage() > 0;
-            addButton("Next", right - 63, panelHeight - 54, 53, 18,
-                b -> select(selected, true, body.historyPage() + 1)).active = body.historyPage() + 1 < body.historyPages();
+            previousHistory = button("Previous", 14, panelHeight - 32, 68, 20, b -> select(selected, true, body.historyPage() - 1));
+            nextHistory = button("Next", panelWidth - 82, panelHeight - 32, 68, 20, b -> select(selected, true, body.historyPage() + 1));
         }
         updateButtons();
     }
-
-    private Button addButton(String label, int x, int y, int w, int h, Button.OnPress press) {
-        return addRenderableWidget(Button.builder(Component.literal(label), press).bounds(x, y + offsetY, w, h).build());
+    private Button button(String label, int x, int y, int w, int h, Button.OnPress press) {
+        return addRenderableWidget(Button.builder(Component.literal(label), press).bounds(left + x, top + y, w, h).build());
     }
-    private int regionHeight() { return Math.max(18, Math.min(28, (panelHeight - 130) / 6)); }
-    private int treatmentRowHeight() { return BodyLayout.cureRowHeight(panelHeight); }
+    private List<MaimType> activeTypes() { return Arrays.stream(MaimType.values()).filter(t -> body.region(selected).count(t) > 0).toList(); }
+    private int contentTop() { return 106; }
+    private int contentBottom() { return panelHeight - 48; }
+    private int maxScroll() { return Math.max(0, (history ? body.history().size() * 28 : Math.max(0, activeTypes().size() * 76 - 10)) - (contentBottom() - contentTop())); }
     private void updateButtons() {
-        for (int i = 0; i < treatments.size(); i++) {
-            treatments.get(i).active = body.region(selected).count(MaimType.values()[i]) > 0
-                && body.supplies().get(i) > 0 && progress <= 0;
-        }
-        regions.forEach((r, button) -> button.setMessage(Component.literal(BodyView.label(r) + " " + body.region(r).total())));
+        regions.forEach((region, button) -> button.setMessage(Component.literal(BodyView.label(region) + " (" + body.region(region).total() + ")")));
+        treatments.forEach((type, b) -> {
+            b.active = body.supplies().get(type.ordinal()) > 0 && progress <= 0;
+            int cardTop = b.getY() - 12;
+            b.visible = cardTop >= top + contentTop() && cardTop + 66 <= top + contentBottom();
+        });
+        if (previousHistory != null) previousHistory.active = body.historyPage() > 0;
+        if (nextHistory != null) nextHistory.active = body.historyPage() + 1 < body.historyPages();
         if (done != null) done.setMessage(Component.literal(progress > 0 ? "Cancel" : "Done"));
     }
-
+    @Override public boolean mouseScrolled(double x, double y, double delta) {
+        if (!help && !choosingRegion && x >= left && x < left + panelWidth && y >= top + contentTop() && y < top + contentBottom()) {
+            scroll = Math.max(0, Math.min(maxScroll(), scroll - (int)(delta * (history ? 28 : 76)))); rebuildWidgets(); return true;
+        }
+        return super.mouseScrolled(x, y, delta);
+    }
     @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         renderBackground(g);
-        g.pose().pushPose();
-        g.pose().translate(0, offsetY, 0);
-        g.fill(left, 8, right, panelHeight - 8, PAPER);
-        g.fill(left, 8, left + 3, panelHeight - 8, body.atDoor() ? RED : GREEN);
+        g.fill(left, top, left + panelWidth, top + panelHeight, PAPER);
+        g.fill(left, top, left + 2, top + panelHeight, body.atDoor() ? RED : GREEN);
         boolean self = minecraft.player != null && minecraft.player.getUUID().equals(body.playerId());
-        text(g, self ? "YOUR BODY" : "TREATING " + body.name(), left + 12, 17, INK);
-        String hp = body.atDoor() ? "0 HP · DEATH'S DOOR" : String.format(Locale.ROOT, "%.1f/%.1f HP", body.health(), body.maxHealth());
-        if (body.atDoor()) hp += body.healingLockTicks() > 0
-            ? String.format(Locale.ROOT, " · Heal in %.1fs", body.healingLockTicks() / 20.0) : " · Healing available";
-        text(g, hp, left + 12, 33, body.atDoor() ? RED : MUTED);
-        text(g, "At 0 HP, each hit kills or maims. Injuries add risk.", left + 12, 45, MUTED);
-        text(g, "Trauma " + body.trauma() + " · effects " + Math.round(body.multiplier()*100) + "% · " + body.traumaLifetimeLabel() + " per hit", left + 12, 55, MUTED);
-        text(g, "Body · active count", left + 9, 73, MUTED);
-        renderBody(g);
-        if (history) renderHistory(g); else renderActive(g);
-        g.fill(left + 10, panelHeight - 32, right - 10, panelHeight - 31, 0xFF39434A);
-        if (progress > 0) {
-            g.fill(left + 10, panelHeight - 29, right - 10, panelHeight - 27, 0xFF39434A);
-            g.fill(left + 10, panelHeight - 29, left + 10 + (int)((right-left-20) * progress), panelHeight - 27, GREEN);
+        text(g, self ? "YOUR BODY" : "TREATING " + body.name(), 14, 15, INK);
+        String health = body.atDoor() ? "0 HP · Death's Door" : String.format(Locale.ROOT, "%.1f / %.1f HP", body.health(), body.maxHealth());
+        if (body.atDoor()) health += body.healingLockTicks() > 0 ? String.format(Locale.ROOT, " · heal in %.1fs", body.healingLockTicks()/20.) : " · heal to leave";
+        text(g, health, 14, 37, body.atDoor() ? RED : MUTED);
+        if (help) renderHelp(g);
+        else if (choosingRegion) renderRegions(g);
+        else {
+            if (!history) text(g, effect(), 14, 88, MUTED);
+            else text(g, body.region(selected).treated() + " applied treatments", 14, 88, MUTED);
+            g.enableScissor(left + 12, top + contentTop(), left + panelWidth - 12, top + contentBottom());
+            if (history) renderHistory(g); else renderInjuries(g);
+            g.disableScissor();
+            if (maxScroll() > 0) {
+                text(g, "Scroll ↕", panelWidth - 62, 88, MUTED);
+                int track = contentBottom() - contentTop(), thumb = Math.max(16, track * track / (track + maxScroll()));
+                int y = top + contentTop() + (track-thumb) * scroll / maxScroll();
+                g.fill(left+panelWidth-9,top+contentTop(),left+panelWidth-7,top+contentBottom(),0xFF39434A);
+                g.fill(left+panelWidth-9,y,left+panelWidth-7,y+thumb,MUTED);
+            }
+            if (history) text(g, "Page " + (body.historyPage()+1) + " / " + body.historyPages(), (panelWidth-72)/2, panelHeight-26, MUTED);
         }
-        String footer = status.isEmpty() ? (history ? "Treatment history lasts for this life." : (self ? "Damage interrupts. Keep this screen open." : "Stay close. Keep open. Damage interrupts.")) : status;
-        if (progress > 0) footer += " · " + Math.round(progress * 100) + "%";
-        text(g, footer, left + 12, panelHeight - 23, progress > 0 ? GREEN : MUTED);
-        g.pose().popPose();
-        super.render(g, mouseX, mouseY, partial);
+        int footer = panelHeight - 30;
+        g.fill(left+14,top+footer-7,left+panelWidth-14,top+footer-6,0xFF39434A);
+        String message = status.isEmpty() ? help ? "Treatment history lasts for this life." : choosingRegion ? "Choose a region to inspect or treat." : history ? "Cured injuries remain in this record." : (self ? "Keep open. Damage interrupts treatment." : "Stay close. Keep open. Damage interrupts.") : status;
+        if (progress > 0) {
+            g.fill(left+14,top+footer-7,left+14+(int)((panelWidth-28)*progress),top+footer-5,GREEN);
+            message = "Applying treatment · " + Math.round(progress*100) + "%";
+        }
+        if (!history || help || choosingRegion) g.drawWordWrap(font,Component.literal(message),left+14,top+footer,panelWidth-28,progress>0?GREEN:MUTED);
+        super.render(g,mouseX,mouseY,partial);
     }
-
-    private void renderBody(GuiGraphics g) {
-        int x = left + 7, y = 110;
-        bodyPart(g, Region.HEAD, x + 8, y, 12, 12);
-        bodyPart(g, Region.TORSO, x + 7, y + 15, 14, 27);
-        bodyPart(g, Region.LEFT_ARM, x, y + 15, 5, 30);
-        bodyPart(g, Region.RIGHT_ARM, x + 23, y + 15, 5, 30);
-        bodyPart(g, Region.LEFT_LEG, x + 7, y + 44, 6, 33);
-        bodyPart(g, Region.RIGHT_LEG, x + 15, y + 44, 6, 33);
-    }
-    private void bodyPart(GuiGraphics g, Region region, int x, int y, int w, int h) {
-        var r = body.region(region);
-        int border = selected == region ? INK : 0xFF55636B;
-        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, border);
-        int color = r.total() == 0 ? 0xFF4F6960 : r.total() < 3 ? 0xFFA66F61 : 0xFFC58673;
-        g.fill(x, y, x + w, y + h, color);
-        if (r.treated() > 0) { g.fill(x, y + h / 2, x + w, y + h / 2 + 3, GREEN); }
-    }
-
-    private void renderActive(GuiGraphics g) {
-        text(g, BodyView.label(selected) + " · " + body.region(selected).total() + " active", detail, 93, INK);
-        String effect = switch (selected) {
+    private String effect() {
+        String label = switch(selected) {
             case HEAD -> "Extra death risk: +";
             case TORSO -> "Maximum HP: -";
-            case LEFT_LEG, RIGHT_LEG -> "Movement (this leg): -";
+            case LEFT_LEG, RIGHT_LEG -> "Movement from this leg: -";
             case LEFT_ARM, RIGHT_ARM -> "Both arms: melee & reach -";
         };
-        text(g, effect + Math.round(body.region(selected).reduction() * 100) + "%", detail, 105, MUTED);
-        for (MaimType type : MaimType.values()) {
-            int y = BodyLayout.CURE_TOP + type.ordinal() * treatmentRowHeight();
-            int n = body.region(selected).count(type), available = body.supplies().get(type.ordinal());
-            text(g, BodyView.label(type) + " ×" + n, detail, y + 1, n > 0 ? RED : MUTED);
-            String info = n == 0 ? "No injury to cure" : available == 0
-                ? "Need 1 " + InjuryItems.cureName(type) + " · you have 0 · " + String.format(Locale.ROOT, "%.1fs", body.treatmentSeconds())
-                : "You: " + available + " · uses 1 · " + String.format(Locale.ROOT, "%.1fs", body.treatmentSeconds());
-            text(g, info, detail, y + BodyLayout.CURE_INFO_OFFSET, available == 0 && n > 0 ? RED : MUTED);
+        return label + Math.round(body.region(selected).reduction()*100) + "%";
+    }
+    private void renderInjuries(GuiGraphics g) {
+        List<MaimType> types = activeTypes();
+        if (types.isEmpty()) {
+            text(g,"No active injuries here",24,contentTop()+20,GREEN);
+            text(g,"Choose another region to inspect your body.",24,contentTop()+40,MUTED); return;
+        }
+        for (int i=0;i<types.size();i++) {
+            MaimType type=types.get(i); int y=contentTop()+i*76-scroll, have=body.supplies().get(type.ordinal());
+            if (y < contentTop() || y + 66 > contentBottom()) continue;
+            g.fill(left+14,top+y,left+panelWidth-14,top+y+66,0xFF252D34);
+            text(g,BodyView.label(type)+" ×"+body.region(selected).count(type),26,y+18,RED);
+            text(g,(have==0?"Need 1 ":"Uses 1 ")+InjuryItems.cureName(type)+" · you have "+have,26,y+40,have==0?RED:MUTED);
+            text(g,String.format(Locale.ROOT,"Treatment time: %.1f seconds",body.treatmentSeconds()),26,y+53,MUTED);
         }
     }
-
     private void renderHistory(GuiGraphics g) {
-        text(g, BodyView.label(selected) + " · " + body.region(selected).treated() + " treatments", detail, 93, INK);
-        if (body.history().isEmpty()) {
-            text(g, "No treatments applied here yet.", detail, 109, MUTED);
-            text(g, "Cure an injury to add its record.", detail, 123, MUTED);
-        } else {
-            for (int i = 0; i < body.history().size(); i++) {
-                var entry = body.history().get(i);
-                var id = net.minecraft.resources.ResourceLocation.tryParse(entry.itemId());
-                var item = id == null ? null : net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-                String name = item == null || item == net.minecraft.world.item.Items.AIR ? entry.itemId() : item.getDescription().getString();
-                String line = entry.index() + ". " + name + " · cured " + BodyView.label(entry.type());
-                float scale = Math.min(1, (right - detail - 10f) / font.width(line));
-                g.pose().pushPose(); g.pose().translate(detail, 110 + i * 11, 0); g.pose().scale(scale, scale, 1);
-                text(g, line, 0, 0, GREEN); g.pose().popPose();
-            }
-        }
-        text(g, (body.historyPage() + 1) + " / " + body.historyPages(), detail + 69, panelHeight - 48, MUTED);
-    }
-
-    private void text(GuiGraphics g, String value, int x, int y, int color) {
-        // Essential copy is laid out to fit at Minecraft's minimum GUI size, never silently elided.
-        g.drawString(font, value, x, y, color, false);
-    }
-    @Override public boolean isPauseScreen() { return false; }
-    @Override public void removed() {
-        if (minecraft.getConnection() != null) RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 2, 0, 0, 0, false));
-        super.removed();
-    }
-
-    private final class RegionButton extends Button {
-        private final Region region;
-        RegionButton(int x, int y, int width, int height, Region region, OnPress press) {
-            super(x, y, width, height, Component.empty(), press, DEFAULT_NARRATION);
-            this.region = region;
-        }
-        @Override protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partial) {
-            int border = selected == region ? GREEN : isHoveredOrFocused() ? INK : 0xFF566168;
-            g.fill(getX(), getY(), getX()+getWidth(), getY()+getHeight(), border);
-            g.fill(getX()+1, getY()+1, getX()+getWidth()-1, getY()+getHeight()-1, 0xFF252D34);
-            float scale = Math.min(1, (getWidth()-6f) / font.width(getMessage()));
-            g.pose().pushPose();
-            g.pose().translate(getX()+3, getY()+(getHeight()-8*scale)/2, 0);
-            g.pose().scale(scale, scale, 1);
-            g.drawString(font, getMessage(), 0, 0, body.region(region).total()>0 ? RED : GREEN, false);
-            g.pose().popPose();
+        if(body.history().isEmpty()){text(g,"No treatments applied here yet.",24,contentTop()+20,MUTED);return;}
+        for(int i=0;i<body.history().size();i++) {
+            var entry=body.history().get(i); var id=net.minecraft.resources.ResourceLocation.tryParse(entry.itemId());
+            var item=id==null?null:net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+            String name=item==null||item==net.minecraft.world.item.Items.AIR?entry.itemId():item.getDescription().getString();
+            int y=contentTop()+i*28-scroll;
+            if (y < contentTop() || y + 23 > contentBottom()) continue;
+            text(g,entry.index()+". "+name+" applied",22,y+2,GREEN);
+            text(g,"Cured "+BodyView.label(entry.type()).toLowerCase(Locale.ROOT),36,y+14,MUTED);
         }
     }
+    private void renderRegions(GuiGraphics g) {
+        text(g,"Choose a body region · active injury counts",14,59,MUTED);
+        int x=panelWidth/2-14,y=89;
+        part(g,Region.HEAD,x+8,y,12,12); part(g,Region.TORSO,x+7,y+15,14,25);
+        part(g,Region.LEFT_ARM,x,y+15,5,28); part(g,Region.RIGHT_ARM,x+23,y+15,5,28);
+        part(g,Region.LEFT_LEG,x+7,y+43,6,31); part(g,Region.RIGHT_LEG,x+15,y+43,6,31);
+    }
+    private void part(GuiGraphics g,Region region,int x,int y,int w,int h) {
+        g.fill(left+x-1,top+y-1,left+x+w+1,top+y+h+1,region==selected?INK:0xFF55636B);
+        g.fill(left+x,top+y,left+x+w,top+y+h,body.region(region).total()==0?0xFF4F6960:0xFFA66F61);
+        if(body.region(region).treated()>0)g.fill(left+x,top+y+h/2,left+x+w,top+y+h/2+3,GREEN);
+    }
+    private void renderHelp(GuiGraphics g) {
+        String[] lines={"At zero HP you enter Death's Door.","Every further hit kills or maims.","More active injuries mean more death risk.","Heal above zero to leave. Injuries remain.","Cracked → Stick   ·   Burnt → Balm","Opened → Soocher","Recent hits intensify physical penalties.","Trauma: "+body.trauma()+" · effects "+Math.round(body.multiplier()*100)+"% · "+body.traumaLifetimeLabel()+" per hit"};
+        for(int i=0;i<lines.length;i++)text(g,lines[i],14,61+i*15,i<4?INK:MUTED);
+    }
+    private void text(GuiGraphics g,String text,int x,int y,int color) { g.drawString(font,text,left+x,top+y,color,false); }
+    @Override public void tick() { if (progress <= 0 && statusTicks > 0 && --statusTicks == 0) status = ""; }
+    @Override public boolean isPauseScreen(){return false;}
+    @Override public void removed(){if(minecraft.getConnection()!=null)RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(),2,0,0,0,false));super.removed();}
 }

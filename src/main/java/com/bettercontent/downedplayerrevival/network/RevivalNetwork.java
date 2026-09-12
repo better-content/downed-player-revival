@@ -29,7 +29,7 @@ public final class RevivalNetwork {
  }
  private static int treated(BodySnapshot s,Region r,MaimType t){return (int)s.treatmentHistory().stream().filter(m->m.region()==r&&m.type()==t).count();}
  private static int count(BodySnapshot s,Region r,MaimType t){return (int)s.activeMaims().stream().filter(m->m.region()==r&&m.type()==t).count();}
- public static void sendBody(ServerPlayer viewer,ServerPlayer subject,BodySnapshot s){sendBody(viewer,subject,s,Region.HEAD,false,0);}
+ public static void sendBody(ServerPlayer viewer,ServerPlayer subject,BodySnapshot s){if(!canInspect(viewer,subject))return;sendBody(viewer,subject,s,Region.HEAD,false,0);send(viewer,new UiControlPacket("body-view","regions",0,0));}
  public static void sendBody(ServerPlayer viewer,ServerPlayer subject,BodySnapshot s,Region r,boolean history,int page){if(!canInspect(viewer,subject))return;VIEWERS.put(viewer.getUUID(),new Viewing(subject.getUUID(),r,history,page));send(viewer,new StateSyncPacket(view(viewer,subject,s,r,page),1,r.ordinal(),history));}
  public static void closeBody(ServerPlayer viewer){VIEWERS.remove(viewer.getUUID());}
  public static void sync(ServerPlayer player,BodySnapshot s){send(player,new StateSyncPacket(view(player,player,s,Region.HEAD,0),0,0,false));for(var entry:new ArrayList<>(VIEWERS.entrySet())){var viewer=player.server.getPlayerList().getPlayer(entry.getKey());var v=entry.getValue();if(viewer==null){VIEWERS.remove(entry.getKey());continue;}if(v.subject.equals(player.getUUID())){if(canInspect(viewer,player))send(viewer,new StateSyncPacket(view(viewer,player,s,v.region,v.page),3,v.region.ordinal(),v.history));else{closeBody(viewer);send(viewer,new UiControlPacket("close","Too far away to treat",0,0));}}}}
