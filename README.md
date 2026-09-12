@@ -165,6 +165,15 @@ Pillager Campaigns keeps fighting through Death’s Door; Player Traces records 
 Legacy Revival API/event consumers require updates before deploying this provider. Teaching-surface
 changes are intentionally separate from this implementation.
 
+Dynamic Survival HUD is an optional client presentation provider. The bridge uses its typed API
+behind a mod-presence guard; gameplay state remains in Revival. Compilation needs the canonical
+`dynamic-survival-hud-1.0.0.jar`, resolved from `BC_CUSTOM_MOD_JAR_DIR` when supplied, otherwise
+`../dynamic-survival-hud/build/libs/`. A blank override or missing JAR fails configuration.
+Release ordering stages the HUD provider first. CI builds the exact HUD source revision pinned in
+its workflow because the currently bundled pack provider predates the injury presentation API.
+The visual lane includes the provider by default; `-PinjuryVisualHud=false` checks standalone
+client behavior without putting the provider on the runtime classpath.
+
 ```sh
 ./gradlew verifyFull stageRuntimeJar
 ```
