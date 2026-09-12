@@ -3,6 +3,7 @@ plugins {
     jacoco
     `maven-publish`
     id("net.minecraftforge.gradle") version "6.0.54"
+    id("org.spongepowered.mixin") version "0.7.38"
 }
 
 group = property("mod_group_id") as String
@@ -17,6 +18,14 @@ java {
     withSourcesJar()
 }
 
+// Actual Minecraft client review, excluded from the deployed runtime JAR.
+val injuryVisual by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations[injuryVisual.implementationConfigurationName].extendsFrom(configurations.implementation.get())
+configurations[injuryVisual.runtimeOnlyConfigurationName].extendsFrom(configurations.runtimeOnly.get())
+
 minecraft {
     mappings("official", property("minecraft_version") as String)
     copyIdeResources = true
@@ -25,6 +34,8 @@ minecraft {
         configureEach {
             workingDirectory(project.file("run"))
             property("forge.logging.console.level", "info")
+            property("mixin.env.remapRefMap", "true")
+            property("mixin.env.refMapRemappingFile", "${projectDir}/build/createSrgToMcp/output.srg")
             property("forge.enabledGameTestNamespaces", property("mod_id") as String)
             mods {
                 create(property("mod_id") as String) {
@@ -32,7 +43,21 @@ minecraft {
                 }
             }
         }
-        create("client")
+        val baseClient = create("client")
+        create("injuryVisual") {
+            parent(baseClient)
+            workingDirectory(project.file("build/injury-visual"))
+            args("--width", providers.gradleProperty("injuryVisualWidth").orElse("1280").get(),
+                "--height", providers.gradleProperty("injuryVisualHeight").orElse("720").get())
+            mods { getByName(property("mod_id") as String).source(injuryVisual) }
+        }
+        create("injuryHelper") {
+            parent(baseClient)
+            workingDirectory(project.file("build/injury-helper"))
+            args("--username", "InjuryHelper", "--width", "1280", "--height", "720")
+            property("injury.review.helper", "true")
+            mods { getByName(property("mod_id") as String).source(injuryVisual) }
+        }
         create("server") { arg("--nogui") }
         create("gameTestServer")
     }
@@ -40,12 +65,32 @@ minecraft {
 
 repositories {
     maven("https://maven.minecraftforge.net")
+    maven("https://www.cursemaven.com")
+    ivy {
+        name = "injuryVisualHud"
+        url = uri("../dynamic-survival-hud/build/libs")
+        patternLayout { artifact("[artifact]-[revision].[ext]") }
+        metadataSources { artifact() }
+        content { includeGroup("bettercontent.visual") }
+    }
     mavenCentral()
 }
 
 dependencies {
     minecraft("net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
+    annotationProcessor("org.spongepowered:mixin:0.8.5:processor")
+    compileOnly(fg.deobf("curse.maven:epic-fight-mod-405076:8049910"))
+    // Opt-in repository-local compatibility verification; not a pack test or deployment.
+    if (providers.gradleProperty("injuryEpicTests").orNull == "true") {
+        runtimeOnly(fg.deobf("curse.maven:epic-fight-mod-405076:8049910"))
+    }
+    add(injuryVisual.runtimeOnlyConfigurationName, fg.deobf("bettercontent.visual:dynamic-survival-hud:1.0.0"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+}
+
+mixin {
+    add(sourceSets.main.get(), "downed_player_revival.refmap.json")
+    config("downed_player_revival.mixins.json")
 }
 
 tasks.processResources {

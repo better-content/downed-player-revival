@@ -2,13 +2,10 @@
 
 ## Unreleased
 
-### Changed
-
-- Forced downed players into the prone swimming pose immediately and continuously on both server and client.
-- Made the local downed state unmistakable with a persistent screen frame, prominent banner and timer, explicit revival and critical states, and labeled give-up status without flashing or color-only cues.
-- Made held Use Item revival binding-aware and self-refreshing so acquiring a target late or a transient server rejection no longer leaves aid stalled.
-- Made the authored Sneak give-up action available immediately while retaining configurable unlock and hold durations.
-- Made downed-player constraints consistently server-authoritative across item use, containers, block breaking, item and experience pickup, dropping, mounting, sprinting, jumping, and flight.
-- Standardized the project as **Downed Player Revival** with mod ID `downed_player_revival`, artifact `downed-player-revival`, and package `com.bettercontent.downedplayerrevival`.
-- Adopted Java 17 and Forge 1.20.1-47.4.13 as the build baseline without changing the project version.
-- This is a clean break; legacy worlds, configurations, and integrations are not migrated.
+- Replace binary downed/revive episodes with active combat at semantic zero HP, regional maiming, and server-authoritative next-hit death rolls. Preserve ordinary final-death integrations and disable player totem rescue.
+- Add six body regions, three simple cures, interruptible self/teammate treatment, unbounded current-life treatment history, and a frozen final-death recap.
+- Add independent expiring trauma, tunable regional penalties, a two-second healing lock, causal damage classification, and optional Epic Fight reach/collider integration.
+- Add an inventory Body screen, honest death-pressure feedback, Dynamic Survival HUD integration, and operator console controls for real-client visual review.
+- Replace the obsolete revival API/events with read-only injury state and committed injury events. Existing consumers must update together before deployment.
+- Keep the runtime ID `downed_player_revival` and artifact `downed-player-revival`; display the mechanic as Death's Door. Convert an existing same-ID downed episode to active Death's Door and release its forced pose.
+- Add deterministic model tests, real-player GameTests, optional Epic Fight runtime tests, and a development-only command-driven visual review client.

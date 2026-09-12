@@ -10,7 +10,7 @@ displayURL="https://github.com/better-content/downed_player_revival"
 issueTrackerURL="https://github.com/better-content/downed_player_revival/issues"
 authors="Better Content"
 description='''
-Down but not out: a server-authoritative cooperative downed_player_revival system.
+At zero HP, keep fighting. Server-authoritative regional injuries, treatment, and borrowed time.
 '''
 
 [[dependencies.${mod_id}]]
