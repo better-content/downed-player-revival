@@ -2,6 +2,8 @@
 
 Revival is the Better Content pack's Forge 1.20.1 cooperative downed-player system. Eligible lethal damage leaves a player down but not out, giving nearby players a short, tactile rescue window before the ordinary death pipeline resumes.
 
+Downed players are forced into Minecraft's prone swimming pose until they are revived or die.
+
 ## Player controls
 
 - Hold the configured **Use Item** binding while aiming at a downed player to revive them. The aid intent follows the binding and automatically recovers from transient server-side range, sight, or facing rejection while the target remains valid.

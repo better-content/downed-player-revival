@@ -63,6 +63,7 @@ public final class RevivalGameTests {
         DownedPlayerConstraints.enforce(player);
 
         if (player.getForcedPose() != Pose.SWIMMING
+                || player.getPose() != Pose.SWIMMING
                 || player.isSprinting()
                 || player.isShiftKeyDown()
                 || player.getAbilities().flying

@@ -1,6 +1,7 @@
 package com.bettercontent.downedplayerrevival.client;
 
 import com.bettercontent.downedplayerrevival.network.StateSyncPacket;
+import com.bettercontent.downedplayerrevival.state.DownedPlayerConstraints;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
@@ -18,6 +19,7 @@ public final class ClientRevivalState {
     public static void accept(StateSyncPacket packet) {
         if (packet.downed()) {
             STATES.put(packet.playerId(), packet);
+            forcePose(packet.playerId());
         } else {
             STATES.remove(packet.playerId());
             clearPose(packet.playerId());
@@ -41,7 +43,7 @@ public final class ClientRevivalState {
         STATES.entrySet().removeIf(entry -> {
             Player player = minecraft.level.getPlayerByUUID(entry.getKey());
             if (player == null) return true;
-            player.setForcedPose(Pose.SWIMMING);
+            DownedPlayerConstraints.forcePronePose(player);
             return false;
         });
     }
@@ -57,5 +59,12 @@ public final class ClientRevivalState {
         if (minecraft.level == null) return;
         Player player = minecraft.level.getPlayerByUUID(playerId);
         if (player != null && player.getForcedPose() == Pose.SWIMMING) player.setForcedPose(null);
+    }
+
+    private static void forcePose(UUID playerId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) return;
+        Player player = minecraft.level.getPlayerByUUID(playerId);
+        if (player != null) DownedPlayerConstraints.forcePronePose(player);
     }
 }

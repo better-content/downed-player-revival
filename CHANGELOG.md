@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Forced downed players into the prone swimming pose immediately and continuously on both server and client.
 - Made the local downed state unmistakable with a persistent screen frame, prominent banner and timer, explicit revival and critical states, and labeled give-up status without flashing or color-only cues.
 - Made held Use Item revival binding-aware and self-refreshing so acquiring a target late or a transient server rejection no longer leaves aid stalled.
 - Made the authored Sneak give-up action available immediately while retaining configurable unlock and hold durations.

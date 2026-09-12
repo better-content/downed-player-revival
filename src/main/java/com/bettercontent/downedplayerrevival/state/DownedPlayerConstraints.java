@@ -2,6 +2,7 @@ package com.bettercontent.downedplayerrevival.state;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /** Server-authoritative physical and activity constraints for a downed player. */
@@ -9,7 +10,7 @@ public final class DownedPlayerConstraints {
     private DownedPlayerConstraints() {}
 
     public static void enforce(ServerPlayer player) {
-        player.setForcedPose(Pose.SWIMMING);
+        forcePronePose(player);
         player.stopUsingItem();
         if (player.isPassenger()) player.stopRiding();
         boolean hasNetworkChannel = player.connection != null && player.connection.connection.channel() != null;
@@ -26,6 +27,12 @@ public final class DownedPlayerConstraints {
             player.getAbilities().flying = false;
             if (hasNetworkChannel) player.onUpdateAbilities();
         }
+    }
+
+    /** Applies both the persistent override and the synchronized pose immediately. */
+    public static void forcePronePose(Player player) {
+        player.setForcedPose(Pose.SWIMMING);
+        player.setPose(Pose.SWIMMING);
     }
 
     public static Vec3 constrainMotion(Vec3 motion) {
