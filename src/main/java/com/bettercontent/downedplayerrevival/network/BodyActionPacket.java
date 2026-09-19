@@ -6,12 +6,23 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.*;
 import java.util.function.Supplier;
 public record BodyActionPacket(UUID subject,int action,int region,int type,int page,boolean history) {
- private static final int OPEN_OVERVIEW=3;
+ public static final int INSPECT=0, START_TREATMENT=1, CLOSE=2, OPEN_OVERVIEW=3, PROMOTE_REGION=4;
  public static BodyActionPacket overview(UUID subject){return new BodyActionPacket(subject,OPEN_OVERVIEW,0,0,0,false);}
+ /** Reject malformed client input before it can reach any server state mutation. */
+ public boolean validShape() {
+  if (subject == null || action < INSPECT || action > PROMOTE_REGION) return false;
+  return switch (action) {
+   case INSPECT -> region >= 0 && region < Region.values().length && type >= 0 && type < MaimType.values().length && page >= 0;
+   case START_TREATMENT, CLOSE, OPEN_OVERVIEW -> region == 0 && type == 0 && page == 0 && !history;
+   case PROMOTE_REGION -> region >= 0 && region < Region.values().length && type == 0 && page == 0 && !history;
+   default -> false;
+  };
+ }
  public static void encode(BodyActionPacket p,FriendlyByteBuf b){b.writeUUID(p.subject);b.writeVarInt(p.action);b.writeVarInt(p.region);b.writeVarInt(p.type);b.writeVarInt(p.page);b.writeBoolean(p.history);}
  public static BodyActionPacket decode(FriendlyByteBuf b){return new BodyActionPacket(b.readUUID(),b.readVarInt(),b.readVarInt(),b.readVarInt(),b.readVarInt(),b.readBoolean());}
  public static void handle(BodyActionPacket p,Supplier<NetworkEvent.Context> c){c.get().enqueueWork(()->{
   var viewer=c.get().getSender();if(viewer==null)return;
+  if(!p.validShape())return;
   if(p.action==2){if(RevivalNetwork.isViewing(viewer,p.subject))RevivalManager.closeBody(viewer);return;}
   var subject=viewer.server.getPlayerList().getPlayer(p.subject);if(subject==null||!RevivalNetwork.canInspect(viewer,subject))return;
   if(p.action==OPEN_OVERVIEW){RevivalManager.openBody(viewer,subject);return;}
