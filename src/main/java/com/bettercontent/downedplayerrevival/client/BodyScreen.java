@@ -1,6 +1,5 @@
 package com.bettercontent.downedplayerrevival.client;
 
-import com.bettercontent.downedplayerrevival.InjuryItems;
 import com.bettercontent.downedplayerrevival.network.*;
 import com.bettercontent.downedplayerrevival.state.*;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,9 +19,8 @@ public final class BodyScreen extends Screen {
     private String status = "", helpReturn = "detail";
     private int statusTicks;
     private int left, top, panelWidth, panelHeight, scroll;
-    private final Map<MaimType, Button> treatments = new EnumMap<>(MaimType.class);
     private final Map<Region, Button> regions = new EnumMap<>(Region.class);
-    private Button done, previousHistory, nextHistory;
+    private Button done, start, previousHistory, nextHistory;
 
     public BodyScreen(BodyView body, Region selected, boolean history) {
         super(Component.literal("Body & treatment"));
@@ -30,7 +28,8 @@ public final class BodyScreen extends Screen {
     }
     public BodyView body() { return body; }
     public void update(BodyView next) {
-        boolean changed = !activeTypes().equals(Arrays.stream(MaimType.values()).filter(t -> next.region(selected).count(t) > 0).toList());
+        boolean changed = !activeTypes().equals(Arrays.stream(MaimType.values()).filter(t -> next.region(selected).count(t) > 0).toList())
+            || !body.treatmentPriority().equals(next.treatmentPriority()) || body.treatmentActive() != next.treatmentActive();
         body = next;
         int previousScroll = scroll; scroll = Math.min(scroll, maxScroll());
         if (changed || scroll != previousScroll) { rebuildWidgets(); }
@@ -61,33 +60,29 @@ public final class BodyScreen extends Screen {
         panelWidth = Math.min(500, width - 24); panelHeight = Math.min(390, height - 16);
         left = (width - panelWidth) / 2; top = (height - panelHeight) / 2;
         scroll = Math.min(scroll, maxScroll());
-        treatments.clear(); regions.clear(); previousHistory = nextHistory = null;
+        regions.clear(); previousHistory = nextHistory = null;
         done = button("Done", panelWidth - 58, 12, 44, 20, b -> onClose());
         button(help ? "Back" : "Help", panelWidth - 108, 12, 44, 20, b -> showPage(help ? helpReturn : "help", 0));
-        if (help) return;
+        start = button(body.treatmentActive() ? "Running" : "Start", panelWidth - 170, 12, 56, 20,
+            b -> RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 1, 0, 0, 0, false)));
+        if (help) { updateButtons(); return; }
         if (choosingRegion) {
-            Region[] order = {Region.HEAD, Region.TORSO, Region.LEFT_ARM, Region.RIGHT_ARM, Region.LEFT_LEG, Region.RIGHT_LEG};
             int buttonWidth = (panelWidth - 76) / 2;
-            for (int i = 0; i < order.length; i++) {
-                Region region = order[i];
-                regions.put(region, button(BodyView.label(region) + " (" + body.region(region).total() + ")",
-                    i % 2 == 0 ? 14 : panelWidth - 14 - buttonWidth, 80 + (i / 2) * 36,
-                    buttonWidth, 26, b -> select(region, false, 0)));
+            for (int i = 0; i < body.treatmentPriority().size(); i++) {
+                Region region = body.treatmentPriority().get(i);
+                int x = i % 2 == 0 ? 14 : panelWidth - 14 - buttonWidth;
+                int y = 80 + (i / 2) * 36;
+                regions.put(region, button((i + 1) + ". " + BodyView.label(region) + " (" + body.region(region).total() + ")",
+                    x, y, buttonWidth - 30, 26, b -> select(region, false, 0)));
+                button("↑", x + buttonWidth - 26, y, 26, 26,
+                    b -> RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 4, region.ordinal(), 0, 0, false))).active = i > 0;
             }
-            return;
+            updateButtons(); return;
         }
         button("Region: " + BodyView.label(selected), 14, 55, panelWidth - 166, 22, b -> showPage("regions", 0));
         button("Injuries", panelWidth - 144, 55, 62, 22, b -> select(selected, false, 0)).active = history;
         button("History", panelWidth - 76, 55, 62, 22, b -> select(selected, true, 0)).active = !history;
-        if (!history) {
-            List<MaimType> types = activeTypes();
-            for (int i = 0; i < types.size(); i++) {
-                MaimType type = types.get(i);
-                treatments.put(type, button("Apply " + InjuryItems.cureName(type), panelWidth - 126,
-                    contentTop() + i * 76 - scroll + 12, 98, 22,
-                    b -> RevivalNetwork.CHANNEL.sendToServer(new BodyActionPacket(body.playerId(), 1, selected.ordinal(), type.ordinal(), 0, false))));
-            }
-        } else {
+        if (history) {
             previousHistory = button("Previous", 14, panelHeight - 32, 68, 20, b -> select(selected, true, body.historyPage() - 1));
             nextHistory = button("Next", panelWidth - 82, panelHeight - 32, 68, 20, b -> select(selected, true, body.historyPage() + 1));
         }
@@ -101,15 +96,14 @@ public final class BodyScreen extends Screen {
     private int contentBottom() { return panelHeight - 48; }
     private int maxScroll() { return Math.max(0, (history ? body.history().size() * 28 : Math.max(0, activeTypes().size() * 76 - 10)) - (contentBottom() - contentTop())); }
     private void updateButtons() {
-        regions.forEach((region, button) -> button.setMessage(Component.literal(BodyView.label(region) + " (" + body.region(region).total() + ")")));
-        treatments.forEach((type, b) -> {
-            b.active = body.supplies().get(type.ordinal()) > 0 && progress <= 0;
-            int cardTop = b.getY() - 12;
-            b.visible = cardTop >= top + contentTop() && cardTop + 66 <= top + contentBottom();
-        });
+        regions.forEach((region, button) -> button.setMessage(Component.literal((body.treatmentPriority().indexOf(region) + 1) + ". " + BodyView.label(region) + " (" + body.region(region).total() + ")")));
+        if (start != null) {
+            start.active = !body.treatmentActive() && Arrays.stream(Region.values()).anyMatch(r -> body.region(r).total() > 0);
+            start.setMessage(Component.literal(body.treatmentActive() ? "Running" : "Start"));
+        }
         if (previousHistory != null) previousHistory.active = body.historyPage() > 0;
         if (nextHistory != null) nextHistory.active = body.historyPage() + 1 < body.historyPages();
-        if (done != null) done.setMessage(Component.literal(progress > 0 ? "Cancel" : "Done"));
+        if (done != null) done.setMessage(Component.literal(body.treatmentActive() ? "Cancel" : "Done"));
     }
     @Override public boolean mouseScrolled(double x, double y, double delta) {
         if (!help && !choosingRegion && x >= left && x < left + panelWidth && y >= top + contentTop() && y < top + contentBottom()) {
@@ -145,7 +139,7 @@ public final class BodyScreen extends Screen {
         }
         int footer = panelHeight - 30;
         g.fill(left+14,top+footer-7,left+panelWidth-14,top+footer-6,0xFF39434A);
-        String message = status.isEmpty() ? help ? "Treatment history lasts for this life." : choosingRegion ? "Choose a region to inspect or treat." : history ? "Cured injuries remain in this record." : (self ? "Keep open. Damage interrupts treatment." : "Stay close. Keep open. Damage interrupts.") : status;
+        String message = status.isEmpty() ? help ? "Treatment history lasts for this life." : choosingRegion ? "Set region priority, then press Start." : history ? "Cured injuries remain in this record." : (self ? "Press Start. Damage or closing interrupts care." : "Press Start. Stay close and keep the screen open.") : status;
         if (progress > 0) {
             g.fill(left+14,top+footer-7,left+14+(int)((panelWidth-28)*progress),top+footer-5,GREEN);
             message = "Applying treatment · " + Math.round(progress*100) + "%";
@@ -169,11 +163,11 @@ public final class BodyScreen extends Screen {
             text(g,"Choose another region to inspect your body.",24,contentTop()+40,MUTED); return;
         }
         for (int i=0;i<types.size();i++) {
-            MaimType type=types.get(i); int y=contentTop()+i*76-scroll, have=body.supplies().get(type.ordinal());
+            MaimType type=types.get(i); int y=contentTop()+i*76-scroll;
             if (y < contentTop() || y + 66 > contentBottom()) continue;
             g.fill(left+14,top+y,left+panelWidth-14,top+y+66,0xFF252D34);
             text(g,BodyView.label(type)+" ×"+body.region(selected).count(type),26,y+18,RED);
-            text(g,(have==0?"Need 1 ":"Uses 1 ")+InjuryItems.cureName(type)+" · you have "+have,26,y+40,have==0?RED:MUTED);
+            text(g,"Queued care · no item required",26,y+40,MUTED);
             text(g,String.format(Locale.ROOT,"Treatment time: %.1f seconds",body.treatmentSeconds()),26,y+53,MUTED);
         }
     }
@@ -182,7 +176,7 @@ public final class BodyScreen extends Screen {
         for(int i=0;i<body.history().size();i++) {
             var entry=body.history().get(i); var id=net.minecraft.resources.ResourceLocation.tryParse(entry.itemId());
             var item=id==null?null:net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            String name=item==null||item==net.minecraft.world.item.Items.AIR?entry.itemId():item.getDescription().getString();
+            String name=entry.itemId().equals("downed_player_revival:care")?"Care":item==null||item==net.minecraft.world.item.Items.AIR?entry.itemId():item.getDescription().getString();
             int y=contentTop()+i*28-scroll;
             if (y < contentTop() || y + 23 > contentBottom()) continue;
             text(g,entry.index()+". "+name+" applied",22,y+2,GREEN);
@@ -202,7 +196,7 @@ public final class BodyScreen extends Screen {
         if(body.region(region).treated()>0)g.fill(left+x,top+y+h/2,left+x+w,top+y+h/2+3,GREEN);
     }
     private void renderHelp(GuiGraphics g) {
-        String[] lines={"At zero HP you enter Death's Door.","Every further hit kills or maims.","More active injuries mean more death risk.","Heal above zero to leave. Injuries remain.","Cracked → Stick   ·   Burnt → Balm","Opened → Soocher","Recent hits intensify physical penalties.","Trauma: "+body.trauma()+" · effects "+Math.round(body.multiplier()*100)+"% · "+body.traumaLifetimeLabel()+" per hit"};
+        String[] lines={"At zero HP you enter Death's Door.","Every further hit kills or maims.","More active injuries mean more death risk.","Heal above zero to leave. Injuries remain.","Press Start for automatic ordered care.","Move regions up to change priority.","Recent hits intensify physical penalties.","Trauma: "+body.trauma()+" · effects "+Math.round(body.multiplier()*100)+"% · "+body.traumaLifetimeLabel()+" per hit"};
         for(int i=0;i<lines.length;i++)text(g,lines[i],14,61+i*15,i<4?INK:MUTED);
     }
     private void text(GuiGraphics g,String text,int x,int y,int color) { g.drawString(font,text,left+x,top+y,color,false); }

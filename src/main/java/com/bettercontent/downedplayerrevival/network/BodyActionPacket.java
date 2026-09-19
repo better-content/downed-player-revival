@@ -15,8 +15,9 @@ public record BodyActionPacket(UUID subject,int action,int region,int type,int p
   if(p.action==2){if(RevivalNetwork.isViewing(viewer,p.subject))RevivalManager.closeBody(viewer);return;}
   var subject=viewer.server.getPlayerList().getPlayer(p.subject);if(subject==null||!RevivalNetwork.canInspect(viewer,subject))return;
   if(p.action==OPEN_OVERVIEW){RevivalManager.openBody(viewer,subject);return;}
-  if(p.region<0||p.region>=Region.values().length||p.type<0||p.type>=MaimType.values().length||p.page<0)return;
+  if(p.region<0||p.region>=Region.values().length||p.page<0)return;
   if(p.action==0)RevivalNetwork.sendBody(viewer,subject,RevivalManager.snapshot(subject),Region.values()[p.region],p.history,p.page);
-  else if(p.action==1)RevivalManager.startTreatment(viewer,subject,Region.values()[p.region],MaimType.values()[p.type]);
+  else if(p.action==1)RevivalManager.startTreatment(viewer,subject);
+  else if(p.action==4)RevivalManager.promoteTreatmentRegion(viewer,subject,Region.values()[p.region]);
  });c.get().setPacketHandled(true);}
 }

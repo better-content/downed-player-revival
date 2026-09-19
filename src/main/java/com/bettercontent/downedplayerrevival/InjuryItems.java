@@ -8,6 +8,5 @@ public final class InjuryItems {
  public static final DeferredRegister<Item> ITEMS=DeferredRegister.create(ForgeRegistries.ITEMS,RevivalMod.MOD_ID);
  public static final RegistryObject<Item> BALM=ITEMS.register("balm",()->new Item(new Item.Properties().stacksTo(16)));
  public static final RegistryObject<Item> SOOCHER=ITEMS.register("soocher",()->new Item(new Item.Properties()));
- public static TagKey<Item> treatmentTag(MaimType type){return TagKey.create(net.minecraft.core.registries.Registries.ITEM,new ResourceLocation(RevivalMod.MOD_ID,"treatments/"+type.name().toLowerCase(java.util.Locale.ROOT)));}
- public static String cureName(MaimType type){return switch(type){case CRACKED->"Stick";case BURNT->"Balm";case OPENED->"Soocher";};}
+ // Retain the two registered IDs so existing saved stacks load; neither is a care requirement.
 }

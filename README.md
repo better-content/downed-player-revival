@@ -44,18 +44,15 @@ configured values used for presentation.
 ## Treatment
 
 Open your body through the inventory body icon. Right-click another player within reach and line
-of sight to inspect and treat them. Select a region and a cure; the oldest matching active injury
-is treated first. Damage, closing the body screen, losing reach or sight, and disconnecting interrupt
-treatment. Medicine is consumed only on completion, and each cure remains in treatment history.
+of sight to inspect and treat them. Opening the screen only inspects. Press **Start** to begin
+server-owned automatic care. The queue follows the editable region order, then treats older injuries
+first within each region. Moving a region up changes the order after the current step. No item is
+required or consumed. Damage, closing the body screen, losing reach or sight, and disconnecting
+interrupt treatment. Each completed step remains in treatment history.
 
-| Injury | Cure | Recipe |
-|---|---|---|
-| Cracked | Stick | Vanilla item |
-| Opened | Soocher | One flint + one string |
-| Burnt | Balm | One small flower + one water bottle |
-
-Balm returns its glass bottle on successful application. Burnt includes heat, freezing, and tagged
-corrosive damage. Opened denotes a major wound. Type never changes the region’s functional penalty.
+Burnt includes heat, freezing, and tagged corrosive damage. Opened denotes a major wound. Injury
+type describes the harm; its region determines the functional penalty. Old Balm and Soocher stacks
+remain registered for saved-world compatibility but have no treatment role or recipes.
 
 Body state and treatment history survive reconnects and dimension changes within the current life.
 They clear on confirmed final death. A separate recap retains the final active/treated regional
@@ -83,14 +80,14 @@ downedplayerrevival debug gui PLAYER death-recap
 downedplayerrevival debug gui PLAYER close
 downedplayerrevival debug scenario PLAYER mixed
 downedplayerrevival debug maim PLAYER LEFT_ARM BURNT
-downedplayerrevival debug treatment start HEALER SUBJECT LEFT_ARM OPENED
+downedplayerrevival debug treatment start HEALER SUBJECT
 downedplayerrevival debug treatment cancel HEALER
 downedplayerrevival debug capture PLAYER review-label 12
 downedplayerrevival debug pressure PLAYER 11 true 60
 downedplayerrevival debug presentation PLAYER true false
 ```
 
-Fixture names include `healthy`, `mixed`, `severe`, `missing_medicine`, `long_history`,
+Fixture names include `healthy`, `mixed`, `severe`, `long_history`,
 `healing_lock`, `trauma_expiry`, and `final_death`. The final-death fixture runs real death.
 Commands invoke production screens and handlers; they do not simulate player input.
 `gui PLAYER own-body` invokes the same client-to-server overview request as the inventory Body
@@ -99,7 +96,7 @@ button and shared `openOwnBody` entry point. Explicit region/history commands st
 `pressure PLAYER MAIMS AT_DOOR MAX_HP` creates real server-owned leg injuries and health,
 then reports the actual configured death probability. `presentation PLAYER REDUCED_MOTION SOUND`
 controls the viewing client's presentation settings. History pages are zero-based and retain the
-actual item applied even when treatment tags change. Detailed history uses six-record pages with
+historical item records from earlier saves. New completed steps record hands-on care. Detailed history uses six-record pages with
 no total-history limit. The death-recap command requires an actual completed death.
 
 `./gradlew runInjuryVisual` launches the isolated real Minecraft review client under

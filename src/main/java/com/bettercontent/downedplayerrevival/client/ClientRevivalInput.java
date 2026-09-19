@@ -14,7 +14,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid=RevivalMod.MOD_ID,value=Dist.CLIENT)
 public final class ClientRevivalInput {
- /** Request a fresh authoritative view, including current treatment supplies. */
+ /** Request a fresh authoritative body view and treatment priority. */
  public static void openOwnBody(){var player=Minecraft.getInstance().player;if(player!=null)RevivalNetwork.CHANNEL.sendToServer(BodyActionPacket.overview(player.getUUID()));}
  @SubscribeEvent public static void logout(ClientPlayerNetworkEvent.LoggingOut event){ClientRevivalState.clear();}
  @SubscribeEvent public static void inventory(ScreenEvent.Init.Post event){if(event.getScreen() instanceof InventoryScreen screen){int x=Math.max(3,(screen.width-176)/2-49),y=(screen.height-166)/2;event.addListener(Button.builder(Component.literal("Body"),button->openOwnBody()).bounds(x,y,46,20).build());}}

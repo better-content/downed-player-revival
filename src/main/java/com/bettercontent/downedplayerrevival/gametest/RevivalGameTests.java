@@ -198,26 +198,49 @@ public final class RevivalGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 150)
-    public static void treatmentConsumesAtCompletionAndRetainsHistoryAndBottle(GameTestHelper helper) {
+    public static void treatmentRequiresStartAndCuresWithoutItems(GameTestHelper helper) {
         Fixture f = new Fixture(helper);
         helper.runAtTickTime(65, () -> {
             try {
                 RevivalManager.state(f.player).addMaim(Region.LEFT_LEG, MaimType.BURNT, RevivalManager.now(f.player));
                 f.player.getInventory().clearContent();
-                f.player.getInventory().add(new ItemStack(com.bettercontent.downedplayerrevival.InjuryItems.BALM.get(), 2));
                 RevivalManager.openBody(f.player, f.player);
-                RevivalManager.startTreatment(f.player, f.player, Region.LEFT_LEG, MaimType.BURNT);
                 helper.runAtTickTime(helper.getTick() + 20, () -> {
-                    try {
-                        require(RevivalManager.state(f.player).activeMaims().size() == 1, "Treatment cured before its duration");
-                        require(f.player.getInventory().countItem(com.bettercontent.downedplayerrevival.InjuryItems.BALM.get()) == 2, "Treatment consumed before completion");
+                    try { require(RevivalManager.state(f.player).activeMaims().size() == 1, "Opening the screen started treatment");
+                        RevivalManager.startTreatment(f.player, f.player);
+                        helper.runAtTickTime(helper.getTick() + 45, () -> f.finish(() -> {
+                            require(RevivalManager.state(f.player).activeMaims().isEmpty(), "Completed treatment did not cure");
+                            require(RevivalManager.state(f.player).treatmentHistory().size() == 1, "Completed treatment lost history");
+                            require(RevivalManager.state(f.player).treatmentHistory().get(0).itemId().equals("downed_player_revival:care"), "Care recorded a consumable");
+                            require(f.player.getInventory().isEmpty(), "Treatment created or consumed inventory items");
+                        }));
                     } catch (Throwable failure) { f.fail(failure); }
                 });
-                helper.runAtTickTime(helper.getTick() + 45, () -> f.finish(() -> {
-                    require(RevivalManager.state(f.player).activeMaims().isEmpty(), "Completed treatment did not cure");
-                    require(RevivalManager.state(f.player).treatmentHistory().size() == 1, "Completed treatment lost history");
-                    require(f.player.getInventory().countItem(com.bettercontent.downedplayerrevival.InjuryItems.BALM.get()) == 1, "Completed treatment did not consume exactly one balm");
-                    require(f.player.getInventory().countItem(Items.GLASS_BOTTLE) == 1, "Balm did not return exactly one bottle");
+            } catch (Throwable failure) { f.fail(failure); }
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 190)
+    public static void treatmentQueueFollowsEditedRegionPriority(GameTestHelper helper) {
+        Fixture f = new Fixture(helper);
+        helper.runAtTickTime(65, () -> {
+            try {
+                var body = RevivalManager.state(f.player);
+                body.addMaim(Region.HEAD, MaimType.CRACKED, RevivalManager.now(f.player));
+                body.addMaim(Region.LEFT_LEG, MaimType.BURNT, RevivalManager.now(f.player));
+                RevivalManager.openBody(f.player, f.player);
+                for (int i = 0; i < 4; i++) RevivalManager.promoteTreatmentRegion(f.player, f.player, Region.LEFT_LEG);
+                require(RevivalManager.treatmentPriority(f.player).get(0) == Region.LEFT_LEG, "Region priority did not move to the front");
+                RevivalManager.startTreatment(f.player, f.player);
+                helper.runAtTickTime(helper.getTick() + 45, () -> {
+                    try {
+                        require(body.activeMaims().size() == 1 && body.activeMaims().get(0).region() == Region.HEAD,
+                            "Queue did not treat the priority region first");
+                    } catch (Throwable failure) { f.fail(failure); }
+                });
+                helper.runAtTickTime(helper.getTick() + 90, () -> f.finish(() -> {
+                    require(body.activeMaims().isEmpty(), "Queue did not continue to the next region");
+                    require(body.treatmentHistory().size() == 2, "Queue did not record each completed step once");
                 }));
             } catch (Throwable failure) { f.fail(failure); }
         });
@@ -229,9 +252,9 @@ public final class RevivalGameTests {
         helper.runAtTickTime(65, () -> {
             try {
                 RevivalManager.state(f.player).addMaim(Region.LEFT_LEG, MaimType.CRACKED, RevivalManager.now(f.player));
-                f.player.getInventory().clearContent(); f.player.getInventory().add(new ItemStack(Items.STICK, 2));
+                f.player.getInventory().clearContent();
                 RevivalManager.openBody(f.player, f.player);
-                RevivalManager.startTreatment(f.player, f.player, Region.LEFT_LEG, MaimType.CRACKED);
+                RevivalManager.startTreatment(f.player, f.player);
                 helper.runAtTickTime(helper.getTick() + 10, () -> {
                     try { require(f.player.hurt(f.player.damageSources().generic(), 1), "Interrupting damage was rejected"); }
                     catch (Throwable failure) { f.fail(failure); }
@@ -239,7 +262,7 @@ public final class RevivalGameTests {
                 helper.runAtTickTime(helper.getTick() + 50, () -> f.finish(() -> {
                     require(RevivalManager.state(f.player).activeMaims().size() == 1, "Interrupted treatment silently completed");
                     require(RevivalManager.state(f.player).treatmentHistory().isEmpty(), "Interrupted treatment wrote history");
-                    require(f.player.getInventory().countItem(Items.STICK) == 2, "Interrupted treatment consumed medicine");
+                    require(f.player.getInventory().isEmpty(), "Interrupted treatment changed inventory");
                 }));
             } catch (Throwable failure) { f.fail(failure); }
         });
@@ -254,16 +277,15 @@ public final class RevivalGameTests {
                 teammate.player.setPos(subject.player.getX() + 1, subject.player.getY(), subject.player.getZ());
                 RevivalManager.state(subject.player).addMaim(Region.LEFT_LEG, MaimType.CRACKED, RevivalManager.now(subject.player));
                 subject.player.getInventory().clearContent(); teammate.player.getInventory().clearContent();
-                subject.player.getInventory().add(new ItemStack(Items.STICK)); teammate.player.getInventory().add(new ItemStack(Items.STICK));
                 RevivalManager.openBody(subject.player, subject.player);
                 RevivalManager.openBody(teammate.player, subject.player);
-                RevivalManager.startTreatment(subject.player, subject.player, Region.LEFT_LEG, MaimType.CRACKED);
-                RevivalManager.startTreatment(teammate.player, subject.player, Region.LEFT_LEG, MaimType.CRACKED);
+                RevivalManager.startTreatment(subject.player, subject.player);
+                RevivalManager.startTreatment(teammate.player, subject.player);
                 helper.runAtTickTime(helper.getTick() + 45, () -> {
                     try {
                         require(RevivalManager.state(subject.player).activeMaims().isEmpty(), "Concurrent treatment failed to cure");
                         require(RevivalManager.state(subject.player).treatmentHistory().size() == 1, "Concurrent treatment wrote duplicate history");
-                        require(subject.player.getInventory().countItem(Items.STICK) + teammate.player.getInventory().countItem(Items.STICK) == 1, "Concurrent treatment consumed twice");
+                        require(subject.player.getInventory().isEmpty() && teammate.player.getInventory().isEmpty(), "Concurrent treatment changed inventory");
                         teammate.cleanup(); subject.finish(() -> { });
                     } catch (Throwable failure) { teammate.cleanup(); subject.fail(failure); }
                 });

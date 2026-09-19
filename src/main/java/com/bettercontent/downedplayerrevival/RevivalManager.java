@@ -29,6 +29,8 @@ public final class RevivalManager {
     private static final String LEGACY = "downed_player_revival:state";
     private static final String RECAP = "downed_player_revival:recap";
     private static final String FINALIZED = "downed_player_revival:finalized";
+    private static final String TREATMENT_PRIORITY = "downed_player_revival:treatment_priority";
+    private static final String HANDS_ON_CARE = "downed_player_revival:care";
     private static final Map<ServerPlayer, BodyState> STATES = new IdentityHashMap<>();
     private static final Set<ServerPlayer> DIRTY = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<ServerPlayer> HEALED = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -223,19 +225,44 @@ public final class RevivalManager {
     public static void closeBody(ServerPlayer viewer) {
         cancelTreatment(viewer, "Treatment canceled"); RevivalNetwork.closeBody(viewer);
     }
-    public static void startTreatment(ServerPlayer viewer, ServerPlayer subject, Region region, MaimType type) {
+    public static List<Region> treatmentPriority(ServerPlayer viewer) {
+        int[] saved = viewer.getPersistentData().getIntArray(TREATMENT_PRIORITY);
+        if (saved.length != Region.values().length) return List.of(Region.values());
+        List<Region> order = new ArrayList<>();
+        for (int value : saved) {
+            if (value < 0 || value >= Region.values().length || order.contains(Region.values()[value])) return List.of(Region.values());
+            order.add(Region.values()[value]);
+        }
+        return List.copyOf(order);
+    }
+    public static boolean isTreating(ServerPlayer healer, ServerPlayer subject) {
+        Treatment treatment = TREATMENTS.get(healer.getUUID());
+        return treatment != null && treatment.subject.equals(subject.getUUID());
+    }
+    public static void promoteTreatmentRegion(ServerPlayer viewer, ServerPlayer subject, Region region) {
         if (!validTreatmentTarget(viewer, subject) || !RevivalNetwork.isViewing(viewer, subject)) return;
-        Optional<Maim> maim = state(subject).activeMaims().stream().filter(m -> m.region() == region && m.type() == type)
-            .min(Comparator.comparingLong(Maim::tick).thenComparingLong(Maim::id));
-        if (maim.isEmpty() || findCure(viewer, type) < 0) { RevivalNetwork.treatmentStatus(viewer, subject, 0, maim.isEmpty() ? "No matching injury" : "Required treatment missing"); return; }
-        TREATMENTS.put(viewer.getUUID(), new Treatment(viewer.getUUID(), subject.getUUID(), maim.get().id(), region, type));
-        RevivalNetwork.treatmentStatus(viewer, subject, 0, "Applying treatment");
+        List<Region> order = new ArrayList<>(treatmentPriority(viewer));
+        int index = order.indexOf(region);
+        if (index <= 0) return;
+        Collections.swap(order, index, index - 1);
+        viewer.getPersistentData().putIntArray(TREATMENT_PRIORITY, order.stream().mapToInt(Enum::ordinal).toArray());
+        RevivalNetwork.refreshViewing(viewer, subject);
+    }
+    public static void startTreatment(ServerPlayer viewer, ServerPlayer subject) {
+        if (!validTreatmentTarget(viewer, subject) || !RevivalNetwork.isViewing(viewer, subject)) return;
+        if (TREATMENTS.containsKey(viewer.getUUID())) return;
+        Maim maim = nextMaim(viewer, subject);
+        if (maim == null) { RevivalNetwork.treatmentStatus(viewer, subject, 0, "No active injuries"); return; }
+        TREATMENTS.put(viewer.getUUID(), new Treatment(viewer.getUUID(), subject.getUUID(), maim));
+        RevivalNetwork.treatmentStatus(viewer, subject, 0, "Treatment started");
+        RevivalNetwork.refreshViewing(viewer, subject);
     }
     public static void cancelTreatment(ServerPlayer viewer, String reason) {
         Treatment previous = TREATMENTS.remove(viewer.getUUID());
         if (previous != null && viewer.connection != null) {
             ServerPlayer target = viewer.server.getPlayerList().getPlayer(previous.subject);
             RevivalNetwork.treatmentStatus(viewer, target == null ? viewer : target, 0, reason);
+            if (target != null) RevivalNetwork.refreshViewing(viewer, target);
         }
     }
     private static void interruptParticipant(ServerPlayer p, String reason) {
@@ -246,38 +273,39 @@ public final class RevivalManager {
             }
         }
     }
-    private static int findCure(ServerPlayer p, MaimType type) {
-        for (int i = 0; i < p.getInventory().getContainerSize(); i++) if (p.getInventory().getItem(i).is(InjuryItems.treatmentTag(type))) return i;
-        return -1;
+    private static Maim nextMaim(ServerPlayer healer, ServerPlayer subject) {
+        List<Region> order = treatmentPriority(healer);
+        return state(subject).activeMaims().stream().min(Comparator
+            .comparingInt((Maim m) -> order.indexOf(m.region()))
+            .thenComparingLong(Maim::tick).thenComparingLong(Maim::id)).orElse(null);
     }
     private static void tickTreatment(MinecraftServer server, Treatment treatment) {
         ServerPlayer healer = server.getPlayerList().getPlayer(treatment.healer), subject = server.getPlayerList().getPlayer(treatment.subject);
         if (healer == null) { TREATMENTS.remove(treatment.healer); return; }
         if (!validTreatmentTarget(healer, subject) || !RevivalNetwork.isViewing(healer, subject)) { cancelTreatment(healer, "Treatment interrupted: target out of reach"); return; }
-        Optional<Maim> oldest = state(subject).activeMaims().stream().filter(m -> m.region() == treatment.region && m.type() == treatment.type)
-            .min(Comparator.comparingLong(Maim::tick).thenComparingLong(Maim::id));
-        int slot = findCure(healer, treatment.type);
-        if (oldest.isEmpty() || oldest.get().id() != treatment.maimId || slot < 0) { cancelTreatment(healer, "Treatment interrupted: injury or medicine changed"); return; }
+        boolean stillPresent = state(subject).activeMaims().stream().anyMatch(m -> m.id() == treatment.maimId);
+        if (!stillPresent) {
+            Maim next = nextMaim(healer, subject);
+            if (next == null) { cancelTreatment(healer, "Treatment complete"); return; }
+            treatment.select(next);
+        }
         treatment.progress += 1 / (20 * snapshot(healer).treatmentSeconds());
         if (treatment.progress < 1) {
             if (healer.tickCount % 2 == 0) RevivalNetwork.treatmentStatus(healer, subject, (float) treatment.progress, "Applying treatment");
             return;
         }
-        ItemStack cure = healer.getInventory().getItem(slot);
-        String itemId = ForgeRegistries.ITEMS.getKey(cure.getItem()).toString();
-        boolean bottle = cure.is(InjuryItems.BALM.get());
-        TreatmentRecord record = state(subject).cureOldest(treatment.region, treatment.type, itemId, now(subject)).orElseThrow();
-        cure.shrink(1); healer.getInventory().setChanged();
-        if (bottle) { ItemStack glass = new ItemStack(Items.GLASS_BOTTLE); if (!healer.getInventory().add(glass)) healer.drop(glass, false); }
-        TREATMENTS.remove(healer.getUUID());
+        TreatmentRecord record = state(subject).cureOldest(treatment.region, treatment.type, HANDS_ON_CARE, now(subject)).orElseThrow();
         save(subject); refresh(subject);
-        RevivalNetwork.treatmentStatus(healer, subject, 1, "Treatment applied — injury cured");
         subject.level().playSound(null, subject, SoundEvents.ARMOR_EQUIP_LEATHER, SoundSource.PLAYERS, .65f, .85f);
         MinecraftForge.EVENT_BUS.post(new InjuryEvent.Treated(subject, snapshot(subject), healer, record));
+        Maim next = nextMaim(healer, subject);
+        if (next == null) cancelTreatment(healer, "Treatment complete");
+        else { treatment.select(next); RevivalNetwork.treatmentStatus(healer, subject, 0, "Continuing treatment"); }
     }
     private static final class Treatment {
-        final UUID healer, subject; final long maimId; final Region region; final MaimType type; double progress;
-        Treatment(UUID healer, UUID subject, long id, Region region, MaimType type) { this.healer = healer; this.subject = subject; this.maimId = id; this.region = region; this.type = type; }
+        final UUID healer, subject; long maimId; Region region; MaimType type; double progress;
+        Treatment(UUID healer, UUID subject, Maim maim) { this.healer = healer; this.subject = subject; select(maim); }
+        void select(Maim maim) { maimId = maim.id(); region = maim.region(); type = maim.type(); progress = 0; }
     }
 
     public static void finalDeath(ServerPlayer p, DamageSource source) {
@@ -333,6 +361,7 @@ public final class RevivalManager {
     }
     public static void clonePlayer(ServerPlayer old, ServerPlayer replacement, boolean death) {
         STATES.remove(replacement);
+        replacement.getPersistentData().putIntArray(TREATMENT_PRIORITY, treatmentPriority(old).stream().mapToInt(Enum::ordinal).toArray());
         replacement.getPersistentData().remove(RECAP); replacement.getPersistentData().remove(FINALIZED);
         if (death) { replacement.getPersistentData().remove(BodyState.ROOT_TAG); STATES.put(replacement, new BodyState()); }
         else { STATES.put(replacement, state(old).copy()); save(replacement); }
@@ -344,13 +373,9 @@ public final class RevivalManager {
     /** Explicit admin fixture command; callers restrict this to isolated review players. */
     public static void debugScenario(ServerPlayer p, String fixture) {
         fixture = fixture.replace('_', '-');
-        if (!Set.of("healthy", "mixed", "severe", "missing-medicine", "long-history", "door", "healing-lock", "trauma-expiry", "final-death").contains(fixture)) throw new IllegalArgumentException("Unknown injury fixture");
+        if (!Set.of("healthy", "mixed", "severe", "long-history", "door", "healing-lock", "trauma-expiry", "final-death").contains(fixture)) throw new IllegalArgumentException("Unknown injury fixture");
         if (fixture.equals("final-death")) { p.hurt(p.damageSources().genericKill(), Float.MAX_VALUE); return; }
         interruptParticipant(p, "Review scenario reset");
-        for (int slot = 0; slot < p.getInventory().getContainerSize(); slot++) {
-            ItemStack stack = p.getInventory().getItem(slot);
-            for (MaimType cureType : MaimType.values()) if (stack.is(InjuryItems.treatmentTag(cureType))) stack.setCount(0);
-        }
         p.getPersistentData().remove(FINALIZED); p.getPersistentData().remove(RECAP);
         state(p).clear(); TERMINATING.remove(p); PENDING_ROLLED_MAIMS.remove(p);
         if (!fixture.equals("healthy")) {
@@ -365,14 +390,6 @@ public final class RevivalManager {
         }
         if (fixture.equals("door") || fixture.equals("healing-lock") || fixture.equals("severe")) { state(p).enterDoor(now(p), RevivalConfig.tuning()); setHealthInternal(p, SENTINEL); }
         else { applyModifiers(p); setHealthInternal(p, p.getMaxHealth()); }
-        if (fixture.equals("missing-medicine")) {
-            for (int slot = 0; slot < p.getInventory().getContainerSize(); slot++) {
-                ItemStack stack = p.getInventory().getItem(slot);
-                for (MaimType type : MaimType.values()) if (stack.is(InjuryItems.treatmentTag(type))) stack.setCount(0);
-            }
-        } else {
-            p.getInventory().add(new ItemStack(Items.STICK, 64)); p.getInventory().add(new ItemStack(InjuryItems.BALM.get(), 16)); p.getInventory().add(new ItemStack(InjuryItems.SOOCHER.get(), 64));
-        }
         save(p); refresh(p);
     }
 }
