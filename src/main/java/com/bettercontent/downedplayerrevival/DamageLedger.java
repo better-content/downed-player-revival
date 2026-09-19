@@ -39,6 +39,18 @@ public final class DamageLedger {
         }
     }
 
+    /** Pure accumulation used by the live hook and by boundary tests. */
+    static Summary accountHit(Summary old, float incoming, float admitted, float unabsorbed, float applied,
+                              float absorptionBefore, float absorptionAfter, float healthBefore, float healthAfter) {
+        double absorbed = Math.max(0, absorptionBefore - absorptionAfter);
+        double postMagic = Math.max(0, unabsorbed) + absorbed;
+        double mitigated = Math.max(0, admitted - postMagic);
+        double lost = Math.max(0, healthBefore - healthAfter);
+        double unknown = incoming - mitigated - absorbed - applied;
+        return new Summary(old.hits + 1, old.incoming + incoming, old.mitigation + mitigated,
+            old.absorption + absorbed, old.applied + applied, old.healthLost + lost, old.unknown + unknown);
+    }
+
     public static Summary snapshot(ServerPlayer player) { return Summary.load(player.getPersistentData().getCompound(KEY)); }
     public static void cloneLife(ServerPlayer old, ServerPlayer replacement, boolean death) {
         if (death) replacement.getPersistentData().remove(KEY);
@@ -58,16 +70,9 @@ public final class DamageLedger {
         Frame frame = stack.pop();
         if (stack.isEmpty()) FRAMES.remove();
         if (frame.player != player || !frame.reachedDamage) return;
-        double absorbed = Math.max(0, frame.absorptionBefore - player.getAbsorptionAmount());
-        double postMagic = Math.max(0, frame.unabsorbed) + absorbed;
-        double mitigated = Math.max(0, frame.admitted - postMagic);
-        double lost = Math.max(0, frame.healthBefore - player.getHealth());
-        // Hook changes and otherwise unobservable transforms retain an honest residual.
-        double unknown = frame.incoming - mitigated - absorbed - frame.applied;
         Summary old = snapshot(player);
-        Summary next = new Summary(old.hits + 1, old.incoming + frame.incoming,
-            old.mitigation + mitigated, old.absorption + absorbed, old.applied + frame.applied,
-            old.healthLost + lost, old.unknown + unknown);
+        Summary next = accountHit(old, frame.incoming, frame.admitted, frame.unabsorbed, frame.applied,
+            frame.absorptionBefore, player.getAbsorptionAmount(), frame.healthBefore, player.getHealth());
         player.getPersistentData().put(KEY, next.save());
     }
     private static Frame current(ServerPlayer player) {
