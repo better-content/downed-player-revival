@@ -313,12 +313,18 @@ public final class RevivalManager {
         BodySnapshot recap = snapshot(p);
         CompoundTag saved = new CompoundTag(); saved.put("body", state(p).save()); saved.putLong("tick", recap.serverTick());
         saved.putFloat("maxHealth", recap.maxHealth()); saved.put("tuning", saveTuning(recap.tuning()));
+        saved.put("damage", DamageLedger.snapshot(p).save());
+        boolean failedProc = TERMINATING.contains(p);
         p.getPersistentData().put(RECAP, saved);
         p.getPersistentData().putBoolean(FINALIZED, true);
         interruptParticipant(p, "Treatment interrupted: life ended");
         state(p).clear(); p.getPersistentData().remove(BodyState.ROOT_TAG);
         DIRTY.remove(p); HEALED.remove(p); TERMINATING.remove(p); PENDING_ROLLED_MAIMS.remove(p);
-        if (p.connection != null) { RevivalNetwork.sync(p, snapshot(p)); RevivalNetwork.sendRecap(p, recap); }
+        if (p.connection != null) {
+            RevivalNetwork.sync(p, snapshot(p));
+            RevivalNetwork.sendRecap(p, recap, DamageLedger.Summary.load(saved.getCompound("damage")));
+            if (failedProc) RevivalNetwork.send(p, new com.bettercontent.downedplayerrevival.network.UiControlPacket("failed-proc", "", 0, 0));
+        }
         MinecraftForge.EVENT_BUS.post(new InjuryEvent.FinalDeath(p, recap, source));
     }
     public static void canceledDeath(ServerPlayer p) {
@@ -338,7 +344,7 @@ public final class RevivalManager {
         CompoundTag tag = p.getPersistentData().getCompound(RECAP);
         if (tag.isEmpty()) return;
         long tick = tag.getLong("tick");
-        RevivalNetwork.sendRecap(p, BodySnapshot.of(p.getUUID(), 0, tag.getFloat("maxHealth"), BodyState.load(tag.getCompound("body"), tick), tick, loadTuning(tag.getCompound("tuning"))));
+        RevivalNetwork.sendRecap(p, BodySnapshot.of(p.getUUID(), 0, tag.getFloat("maxHealth"), BodyState.load(tag.getCompound("body"), tick), tick, loadTuning(tag.getCompound("tuning"))), DamageLedger.Summary.load(tag.getCompound("damage")));
     }
     private static CompoundTag saveTuning(BodyTuning t) {
         CompoundTag tag = new CompoundTag();
@@ -361,6 +367,7 @@ public final class RevivalManager {
     }
     public static void clonePlayer(ServerPlayer old, ServerPlayer replacement, boolean death) {
         STATES.remove(replacement);
+        DamageLedger.cloneLife(old, replacement, death);
         replacement.getPersistentData().putIntArray(TREATMENT_PRIORITY, treatmentPriority(old).stream().mapToInt(Enum::ordinal).toArray());
         replacement.getPersistentData().remove(RECAP); replacement.getPersistentData().remove(FINALIZED);
         if (death) { replacement.getPersistentData().remove(BodyState.ROOT_TAG); STATES.put(replacement, new BodyState()); }

@@ -1,6 +1,8 @@
 package com.bettercontent.downedplayerrevival.client;
 
 import com.bettercontent.downedplayerrevival.network.BodyView;
+import com.bettercontent.downedplayerrevival.network.StateSyncPacket;
+import com.bettercontent.downedplayerrevival.DamageLedger;
 import com.bettercontent.downedplayerrevival.state.Region;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
@@ -23,6 +25,14 @@ class BodyViewCodecTest {
             assertEquals("3 min", original.traumaLifetimeLabel());
             assertEquals(2_100_000, original.region(Region.HEAD).treated());
         } finally { buffer.release(); }
+        var recap = new StateSyncPacket(original, 2, 0, false,
+            new DamageLedger.Summary(27, 122.5, 30, 18, 60.5, 43.5, 14));
+        var recapBuffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            StateSyncPacket.encode(recap, recapBuffer);
+            assertEquals(recap, StateSyncPacket.decode(recapBuffer));
+            assertEquals(0, recapBuffer.readableBytes());
+        } finally { recapBuffer.release(); }
     }
 
     @Test void oversizedHistoryPayloadIsRejectedInsteadOfAllocatingUnboundedClientData() {

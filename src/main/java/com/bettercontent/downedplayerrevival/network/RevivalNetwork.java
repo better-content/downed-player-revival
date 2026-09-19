@@ -7,7 +7,7 @@ import net.minecraftforge.network.*;
 import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.*;
 public final class RevivalNetwork {
- private static final String PROTOCOL="4";
+ private static final String PROTOCOL="5";
  public static final SimpleChannel CHANNEL=NetworkRegistry.newSimpleChannel(new ResourceLocation(RevivalMod.MOD_ID,"main"),()->PROTOCOL,PROTOCOL::equals,PROTOCOL::equals);
  private record Viewing(UUID subject,Region region,boolean history,int page){}
  private static final Map<UUID,Viewing> VIEWERS=new HashMap<>();
@@ -33,7 +33,7 @@ public final class RevivalNetwork {
  public static void closeBody(ServerPlayer viewer){VIEWERS.remove(viewer.getUUID());}
  public static void refreshViewing(ServerPlayer viewer,ServerPlayer subject){var v=VIEWERS.get(viewer.getUUID());if(v!=null&&v.subject.equals(subject.getUUID()))sendBody(viewer,subject,RevivalManager.snapshot(subject),v.region,v.history,v.page);}
  public static void sync(ServerPlayer player,BodySnapshot s){send(player,new StateSyncPacket(view(player,player,s,Region.HEAD,0),0,0,false));for(var entry:new ArrayList<>(VIEWERS.entrySet())){var viewer=player.server.getPlayerList().getPlayer(entry.getKey());var v=entry.getValue();if(viewer==null){VIEWERS.remove(entry.getKey());continue;}if(v.subject.equals(player.getUUID())){if(canInspect(viewer,player))send(viewer,new StateSyncPacket(view(viewer,player,s,v.region,v.page),3,v.region.ordinal(),v.history));else{closeBody(viewer);send(viewer,new UiControlPacket("close","Too far away to treat",0,0));}}}}
- public static void sendRecap(ServerPlayer player,BodySnapshot s){send(player,new StateSyncPacket(view(player,player,s,Region.HEAD,0),2,0,false));}
+ public static void sendRecap(ServerPlayer player,BodySnapshot s,DamageLedger.Summary damage){send(player,new StateSyncPacket(view(player,player,s,Region.HEAD,0),2,0,false,damage));}
  public static void treatmentStatus(ServerPlayer viewer,ServerPlayer subject,float progress,String message){send(viewer,new UiControlPacket("treatment",message,progress,0));}
  public static void send(ServerPlayer player,Object packet){if(player.connection==null)return;CHANNEL.send(PacketDistributor.PLAYER.with(()->player),packet);}
 }

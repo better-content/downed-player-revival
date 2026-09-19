@@ -56,14 +56,18 @@ remain registered for saved-world compatibility but have no treatment role or re
 
 Body state and treatment history survive reconnects and dimension changes within the current life.
 They clear on confirmed final death. A separate recap retains the final active/treated regional
-counts while the player is dead, then clears on respawn. There is no lineage integration.
+counts and per-life accepted-hit totals while the player is dead, then clears on respawn. Incoming
+damage is measured before armor and resistance after shield and hurt-immunity admission. The recap
+separates observed mitigation, absorption, applied damage and actual HP loss; hook changes or other
+unattributed remainder is labeled unknown. There is no lineage integration.
 
 ## Presentation and console review
 
 Skull marks on the heart bar represent the server’s maim-derived death probability. They remain
 subdued above zero to show carried risk; urgent Pressure sound/effects run at Death’s Door. Full
 coverage means 100%. Ordinary hearts remain readable. Treatment and final-death screens expose
-active injuries and treatment history separately.
+active injuries and treatment history separately. A confirmed failed death roll plays its own
+sound; surviving zero crossings do not show a final recap.
 
 Operator-level commands target explicit player names and work from the server console. Use isolated
 review worlds for state-changing scenarios:

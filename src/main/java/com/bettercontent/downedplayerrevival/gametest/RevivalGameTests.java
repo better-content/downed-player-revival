@@ -1,6 +1,7 @@
 package com.bettercontent.downedplayerrevival.gametest;
 
 import com.bettercontent.downedplayerrevival.RevivalConfig;
+import com.bettercontent.downedplayerrevival.DamageLedger;
 import com.bettercontent.downedplayerrevival.RevivalManager;
 import com.bettercontent.downedplayerrevival.RevivalMod;
 import com.bettercontent.downedplayerrevival.api.event.InjuryEvent;
@@ -48,6 +49,8 @@ public final class RevivalGameTests {
             require(f.player.getForcedPose() == null && f.player.getPose() != Pose.SWIMMING, "Death's Door forced a crawling pose");
             require(f.player.isSprinting(), "Death's Door disabled sprinting");
             require(f.probe.deaths == 0 && f.probe.finalDeaths == 0 && f.player.experienceLevel == 7, "Surviving entry ran final-death consequences");
+            require(!f.player.getPersistentData().contains("downed_player_revival:recap"), "Surviving zero crossing created a final-death recap");
+            require(DamageLedger.snapshot(f.player).hits() == 1, "Surviving hit was not counted once in this life");
         });
     }
 

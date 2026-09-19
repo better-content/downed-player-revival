@@ -20,14 +20,20 @@ public final class DeathRecapOverlay {
  /** Consumers reserve measured copy space; this class alone positions native death controls. */
  public static Bounds reserveHint(Screen screen,int measuredHeight){hintScreen=screen;hintHeight=Math.max(0,measuredHeight);int w=Math.min(560,screen.width-16);return new Bounds(Math.max(8,(screen.width-w)/2),108,w,hintHeight);}
  private static int hintOffset(int width,int height){return hintScreen!=null&&hintScreen.width==width&&hintScreen.height==height?hintHeight+4:0;}
- public static Bounds reservedBounds(int width,int height){return new Bounds(Math.max(8,(width-560)/2),Math.max(110,108+hintOffset(width,height)),Math.min(560,width-16),Math.max(0,height-30-Math.max(110,108+hintOffset(width,height))));}
+ public static Bounds reservedBounds(int width,int height){int top=Math.min(Math.max(110,108+hintOffset(width,height)),Math.max(56,height-120));return new Bounds(Math.max(8,(width-560)/2),top,Math.min(560,width-16),Math.max(0,height-30-top));}
  @SubscribeEvent public static void init(ScreenEvent.Init.Post event){if(!(event.getScreen() instanceof DeathScreen screen))return;hintScreen=null;hintHeight=0;var buttons=event.getListenersList().stream().filter(Button.class::isInstance).map(Button.class::cast).toList();if(buttons.size()==2){int buttonWidth=Math.min(200,(screen.width-28)/2);for(int i=0;i<2;i++){var button=buttons.get(i);button.setWidth(buttonWidth);button.setX(screen.width/2+(i==0?-buttonWidth-3:3));button.setY(screen.height-24);}}}
  @SubscribeEvent public static void render(ScreenEvent.Render.Post event){if(!(event.getScreen() instanceof DeathScreen screen))return;BodyView body=ClientRevivalState.recap();if(body==null)return;var mc=Minecraft.getInstance();if(previous!=screen){previous=screen;opened=System.currentTimeMillis();if(InjuryClientConfig.SOUND.get()&&mc.player!=null)mc.player.playSound(SoundEvents.BASALT_BREAK,.35f,.65f);}
   var box=reservedBounds(screen.width,screen.height);var g=event.getGuiGraphics();if(box.height()<48)return;g.fill(box.x(),box.y(),box.x()+box.width(),box.y()+box.height(),0xDA181D23);
-  boolean compact=box.height()<82;
-  g.drawCenteredString(mc.font,compact?"Body · active/treated · Cracked Burnt Opened":"BODY RECORD · Cracked / Burnt / Opened",box.x()+box.width()/2,box.y()+3,BodyScreen.INK);
-  int columns=compact?3:box.width()>=440?3:2,rows=(6+columns-1)/columns,cellW=(box.width()-12)/columns,cellH=(box.height()-14)/rows;
-  for(var region:Region.values()){int i=region.ordinal();if(!InjuryClientConfig.REDUCED_MOTION.get()&&System.currentTimeMillis()-opened<i*80L)continue;int x=box.x()+6+(i%columns)*cellW,y=box.y()+14+(i/columns)*cellH;var r=body.region(region);
+  var damage=ClientRevivalState.recapDamage();
+  boolean compact=box.height()<170;
+  g.drawCenteredString(mc.font,"FINAL LIFE · "+damage.hits()+" accepted hits",box.x()+box.width()/2,box.y()+3,BodyScreen.INK);
+  g.drawString(mc.font,"Incoming "+amount(damage.incoming())+"   Mitigated "+amount(damage.mitigation()),box.x()+6,box.y()+17,BodyScreen.INK,false);
+  g.drawString(mc.font,"Absorbed "+amount(damage.absorption())+"   Applied "+amount(damage.applied()),box.x()+6,box.y()+30,BodyScreen.INK,false);
+  g.drawString(mc.font,"HP lost "+amount(damage.healthLost())+"   Unknown "+amount(damage.unknown()),box.x()+6,box.y()+43,BodyScreen.INK,false);
+  if(compact){int active=body.regions().stream().mapToInt(BodyView.RegionView::total).sum(),treated=body.regions().stream().mapToInt(BodyView.RegionView::treated).sum();g.drawString(mc.font,"Injuries: "+active+" active · "+treated+" treated",box.x()+6,box.y()+58,active>0?BodyScreen.RED:BodyScreen.GREEN,false);return;}
+  g.drawCenteredString(mc.font,"BODY RECORD · Cracked / Burnt / Opened",box.x()+box.width()/2,box.y()+61,BodyScreen.INK);
+  int columns=box.width()>=440?3:2,rows=(6+columns-1)/columns,cellW=(box.width()-12)/columns,cellH=(box.height()-76)/rows;
+  for(var region:Region.values()){int i=region.ordinal();if(!InjuryClientConfig.REDUCED_MOTION.get()&&System.currentTimeMillis()-opened<i*80L)continue;int x=box.x()+6+(i%columns)*cellW,y=box.y()+76+(i/columns)*cellH;var r=body.region(region);
    g.drawString(mc.font,BodyView.label(region),x,y,r.total()>0?BodyScreen.RED:BodyScreen.GREEN,false);
    if(compact)g.drawString(mc.font,r.cracked()+"/"+r.treatedCracked()+"  "+r.burnt()+"/"+r.treatedBurnt()+"  "+r.opened()+"/"+r.treatedOpened(),x,y+9,BodyScreen.INK,false);
    else {
@@ -36,4 +42,5 @@ public final class DeathRecapOverlay {
    }
   }
  }
+ private static String amount(double value){return !Double.isFinite(value)?"unknown":Math.abs(value)>=10000?String.format(java.util.Locale.ROOT,"%.2g",value):String.format(java.util.Locale.ROOT,"%.1f",value);}
 }

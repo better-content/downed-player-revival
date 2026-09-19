@@ -1,6 +1,7 @@
 package com.bettercontent.downedplayerrevival.gametest;
 
 import com.bettercontent.downedplayerrevival.RevivalConfig;
+import com.bettercontent.downedplayerrevival.DamageLedger;
 import com.bettercontent.downedplayerrevival.RevivalManager;
 import com.bettercontent.downedplayerrevival.RevivalMod;
 import com.bettercontent.downedplayerrevival.state.BodyState;
@@ -45,6 +46,11 @@ public final class BodyPersistenceGameTests {
             require(frozen.activeMaims().size() == 1 && frozen.treatmentHistory().size() == 1, "Death recap did not freeze active and treated injuries");
             require(recap.getCompound("tuning").getDouble("v0") == RevivalConfig.tuning().globalDeathPerMaim(), "Recap did not save actual death coefficients");
             require(recap.getCompound("tuning").getInt("trauma") == RevivalConfig.tuning().traumaLifetimeTicks(), "Recap did not save timing coefficients");
+            DamageLedger.Summary damage = DamageLedger.Summary.load(recap.getCompound("damage"));
+            require(damage.hits() == 1 && damage.incoming() >= 100 && damage.applied() >= 100,
+                "Final recap did not freeze the accepted pre-mitigation hit and applied outcome");
+            require(damage.healthLost() > 0 && Math.abs(damage.unknown()) < .01,
+                "Final recap lost actual HP loss or invented an unobserved mitigation remainder");
             CompoundTag savedPlayer = f.player.saveWithoutId(new CompoundTag());
             RevivalManager.logout(f.player);
             Connection reconnectedWire = new Connection(PacketFlow.SERVERBOUND);
